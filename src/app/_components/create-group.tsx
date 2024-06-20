@@ -13,9 +13,9 @@ export default function CreateGroup() {
     const [members, setMembers] = useState(['Alice', 'Bob', 'Carlsten'])
 
     const createGroup = api.group.create.useMutation({
-        onSuccess: () => {
-            router.refresh()
-            setName('')
+        onSuccess: (data) => {
+            const groupId = data.id
+            router.push(`/groups/${groupId}/summary`)
         },
     })
 

@@ -14,13 +14,15 @@ export const groupRouter = createTRPCRouter({
         )
         .mutation(async ({ ctx, input }) => {
             try {
-                await ctx.db.insert(groups).values({
-                    name: input.name,
-                    currency: input.currency,
-                    description: input.description,
-                })
-
-                return { success: true }
+                const newGroup = await ctx.db
+                    .insert(groups)
+                    .values({
+                        name: input.name,
+                        currency: input.currency,
+                        description: input.description,
+                    })
+                    .returning({ id: groups.id })
+                return { success: true, id: newGroup[0]?.id }
             } catch (error) {
                 console.error('Error inserting group:', error)
                 throw new Error('Failed to create group')
