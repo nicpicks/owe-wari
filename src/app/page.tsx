@@ -1,26 +1,28 @@
-import Link from "next/link";
+import Link from 'next/link'
 
-import { CreatePost } from "~/app/_components/create-post";
-import { api } from "~/trpc/server";
+import { CreatePost } from '~/app/_components/create-post'
+import { api } from '~/trpc/server'
 
 export default async function Home() {
-  return (
-    <div className="bg-white text-primary text-center py-40">
-      <h1 className="text-5xl mb-4">
-        <span className="text">Split </span>
-        <span className="text-primary">Expenses</span>
-        <span className="text"> Easily.</span>
-      </h1>
-      <p className="text-xl mb-8 text-gray-500">No need for accounts. No data kept. No shenanigans.</p>
-      <div>
-        <Link href="/groups/create">
-          <button className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded mr-2">
-            Create A Group
-          </button>
-        </Link>
-      </div>
-    </div>
-  );
+    return (
+        <div className="bg-white text-primary text-center py-40">
+            <h1 className="text-5xl mb-4">
+                <span className="text">Split </span>
+                <span className="text-primary">Expenses</span>
+                <span className="text"> Easily.</span>
+            </h1>
+            <p className="text-xl mb-8 text-gray-500">
+                No need for accounts. No data kept. No shenanigans.
+            </p>
+            <div>
+                <Link href="/groups/create">
+                    <button className="bg-primary hover:bg-primary-dark text-white font-bold py-2 px-4 rounded mr-2">
+                        Create A Group
+                    </button>
+                </Link>
+            </div>
+        </div>
+    )
 }
 
 // const hello = await api.post.hello({ text: "from tRPC" });
