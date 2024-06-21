@@ -1,16 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Tabs from '~/app/_components/tabs'
+import { api } from '~/trpc/react'
+
+interface Expense {
+    id: number
+    title: string
+    amount: string
+    category: string | null
+    notes: string | null
+    expenseDate: Date
+}
 
 const ExpensesTab = () => {
     const router = useRouter()
     const pathname = usePathname()
     const groupId = pathname.split('/')[2]?.toString()
     const [totalExpenses, setTotalExpenses] = useState<number>(0)
-    const [expenses, setExpenses] = useState<number[]>([])
+    const [expenses, setExpenses] = useState<Expense[]>([])
+
+    const {
+        data: expensesData,
+        error: expensesError,
+        isLoading: expensesIsLoading,
+    } = api.expense.getExpenses.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId }
+    )
+
+    useEffect(() => {
+        if (expensesData) {
+            setExpenses(expensesData)
+            setTotalExpenses(expensesData.length)
+        }
+        if (expensesError) {
+            console.error('Error fetching expenses', expensesError)
+        }
+    }, [expensesData, expensesError])
 
     const navigateToTab = (tab: string) => {
         router.push(`/groups/${groupId}/${tab}`)
@@ -54,10 +83,10 @@ const ExpensesTab = () => {
                             </div>
                         </div>
 
-                        <div className="mb-4">
+                        <div>
                             {expenses.length === 0 ? (
                                 <>
-                                    <div>
+                                    <div className="mb-4">
                                         <span>No expenses created yet. </span>
                                         <Link
                                             href={`/groups/${groupId}/expenses/create`}
@@ -70,13 +99,38 @@ const ExpensesTab = () => {
                                 </>
                             ) : (
                                 <>
-                                    <div className="text-muted-foreground">
+                                    <div className="text-lg">
                                         Total Expenses:
                                     </div>
-                                    <div className="font-bold">
+                                    <div className="text-primary mb-4">
                                         {' '}
                                         {totalExpenses}
                                     </div>
+                                    {expenses.map((expense, index) => (
+                                        <div
+                                            key={index}
+                                            className="card w-full bg-gray-300 text-black mb-2"
+                                        >
+                                            <div className="card-body">
+                                                <div>
+                                                    Title: {expense.title}
+                                                </div>
+                                                <div>
+                                                    Amount: {expense.amount}
+                                                </div>
+                                                <div>
+                                                    Category: {expense.category}
+                                                </div>
+                                                <div>
+                                                    Expense Date:{' '}
+                                                    {expense.expenseDate.toLocaleDateString()}
+                                                </div>
+                                                <div>
+                                                    Notes: {expense.notes || ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </>
                             )}
                         </div>

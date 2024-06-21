@@ -72,7 +72,7 @@ export default function CreateGroup() {
                                 onChange={(e) => setCurrency(e.target.value)}
                                 className="rounde mb-2 w-full border p-2 text select select-bordered"
                             >
-                                <option value="" disabled selected>
+                                <option value="" disabled defaultValue={'SGD'}>
                                     Currency
                                 </option>
                                 <option value="SGD">SGD</option>

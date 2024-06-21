@@ -111,7 +111,7 @@ export default function CreateExpense() {
                             </label>
                             <input
                                 className="mb-2 w-full rounded border p-2 text input input-bordered"
-                                type="number"
+                                type="text"
                                 placeholder="Amount"
                                 value={amount}
                                 onChange={(e) =>

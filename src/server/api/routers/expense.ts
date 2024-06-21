@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { eq } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import { expenses } from '~/server/db/schema'
@@ -18,23 +19,45 @@ export const expenseRouter = createTRPCRouter({
         )
         .mutation(async ({ ctx, input }) => {
             try {
-                const newExpense = await ctx.db
-                    .insert(expenses)
-                    .values({
-                        groupId: input.groupId,
-                        paidByUserId: input.paidByUserId,
-                        title: input.title,
-                        // check this why i need toString here
-                        amount: input.amount.toString(),
-                        category: input.category,
-                        notes: input.notes,
-                        expenseDate: input.expenseDate,
-                    })
-                    .returning({ id: expenses.id })
-                return { success: true, id: newExpense[0]?.id }
+                await ctx.db.insert(expenses).values({
+                    groupId: input.groupId,
+                    paidByUserId: input.paidByUserId,
+                    title: input.title,
+                    // check this why i need toString here
+                    amount: input.amount.toString(),
+                    category: input.category,
+                    notes: input.notes,
+                    expenseDate: input.expenseDate,
+                })
+
+                return { success: true, id: input.groupId }
             } catch (error) {
                 console.error('Error inserting expense:', error)
                 throw new Error('Failed to create expense')
+            }
+        }),
+
+    getExpenses: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const expensesInGroup = await ctx.db
+                    .select({
+                        id: expenses.id,
+                        title: expenses.title,
+                        amount: expenses.amount,
+                        category: expenses.category,
+                        notes: expenses.notes,
+                        expenseDate: expenses.expenseDate,
+                    })
+                    .from(expenses)
+                    .where(eq(expenses.groupId, input.groupId))
+                    .execute()
+
+                return expensesInGroup
+            } catch (error) {
+                console.error('Error getting expenses:', error)
+                throw new Error('Failed to get expenses')
             }
         }),
 })
