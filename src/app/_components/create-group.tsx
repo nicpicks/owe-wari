@@ -39,8 +39,10 @@ export default function CreateGroup() {
     return (
         <form onSubmit={handleSubmit}>
             <div className="mx-auto flex w-full max-w-screen-md flex-1 flex-col bg-white p-6">
-                <div className="mb-8 rounded-lg bg-primary p-4">
-                    <h2 className="mb-2 text-xl">Group Information</h2>
+                <div className="mb-4 rounded-lg bg-gray-200 p-4">
+                    <h2 className="mb-4 font-bold text-primary text-xl">
+                        Group Information
+                    </h2>
                     <div className="mb-4 flex space-x-4">
                         <input
                             className="mb-2 w-full rounded border p-2 text"
@@ -76,8 +78,10 @@ export default function CreateGroup() {
                     ></textarea>
                 </div>
 
-                <div className="mb-8 rounded-lg bg-primary p-4">
-                    <h2 className="mb-2 text-xl">Members</h2>
+                <div className="mb-4 rounded-lg bg-gray-200 p-4">
+                    <h2 className="mb-4 font-bold text-primary text-xl">
+                        Members
+                    </h2>
                     {members.map((_, index) => (
                         <div key={index} className="mb-2 flex items-center">
                             <input
@@ -86,23 +90,28 @@ export default function CreateGroup() {
                                 placeholder={`Participant ${index + 1}`}
                             />
                             <button
-                                className="ml-2 rounded border p-2"
+                                className="ml-2 rounded bg-primary border p-2"
                                 onClick={() => removeMember(index)}
                             >
-                                Remove
+                                <img
+                                    style={{ width: '22px', height: '22px' }}
+                                    src="/icons/delete.png"
+                                />
                             </button>
                         </div>
                     ))}
                     <button
-                        className="rounded border p-2 text-white hover:bg-accent"
+                        className="mt-2 rounded bg-primary border p-2 text-white hover:bg-accent"
                         onClick={addMember}
                     >
                         Add Member
                     </button>
                 </div>
 
-                <div className="mb-8 rounded-lg bg-primary p-4">
-                    <h2 className="mb-2 text-xl">Payment Settings</h2>
+                <div className="mb-8 rounded-lg bg-gray-200 p-4">
+                    <h2 className="mb-4 font-bold text-primary text-xl">
+                        Payment Settings
+                    </h2>
                     <select className="w-full rounded border p-2">
                         {members.map((_, index) => (
                             <option key={index} value={index}>
