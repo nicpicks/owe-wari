@@ -1,18 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Tabs from '~/app/_components/tabs'
 
 const ExpensesTab = () => {
+    const router = useRouter()
     const pathname = usePathname()
     const groupId = pathname.split('/')[2]?.toString()
     const [totalExpenses, setTotalExpenses] = useState<number>(0)
     const [expenses, setExpenses] = useState<number[]>([])
 
+    const navigateToTab = (tab: string) => {
+        router.push(`/groups/${groupId}/${tab}`)
+    }
+
     return (
         <div className="flex flex-col max-w-screen-md w-full mx-auto">
-            <div className="flex justify-center py-6">
+            <div className="flex py-6">
+                <Tabs pathname={pathname} navigateToTab={navigateToTab} />
+            </div>
+            <div className="flex justify-center">
                 <div className="card w-full bg-gray-200 text-primary-content">
                     <div className="card-body">
                         <div className="flex flex-1">
@@ -20,7 +29,7 @@ const ExpensesTab = () => {
                                 <h2 className="card-title text-primary text-2xl">
                                     Group Expenses
                                 </h2>
-                                <p className="mb-6 text-gray-500 text-s">
+                                <p className="mt-2 mb-6 text-gray-500 text-s">
                                     List of expenses for your group.
                                 </p>
                             </div>

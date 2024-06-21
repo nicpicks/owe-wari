@@ -1,19 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import Tabs from '~/app/_components/tabs'
 
-const SummaryTab = ({ groupId }: { groupId: string }) => {
+const SummaryTab = () => {
     const router = useRouter()
     const pathname = usePathname()
+    const groupId = pathname.split('/')[2]?.toString()
     const [totalExpenses, setTotalExpenses] = useState<number>(0)
     const [currentShare, setCurrentShare] = useState<number>(0)
     const [remainingOwed, setRemainingOwed] = useState<number>(0)
 
+    const navigateToTab = (tab: string) => {
+        router.push(`/groups/${groupId}/${tab}`)
+    }
+
     return (
         <div className="flex flex-col max-w-screen-md w-full mx-auto">
-            <div className="flex justify-center py-6">
-                <div className="card w-full bg-gray-200 text-primary-content ju">
+            <div className="flex py-6">
+                <Tabs pathname={pathname} navigateToTab={navigateToTab} />
+            </div>
+            <div className="flex justify-center">
+                <div className="card w-full bg-gray-200 text-primary-content">
                     <div className="card-body">
                         <h2 className="card-title text-primary text-2xl">
                             Group Summary
