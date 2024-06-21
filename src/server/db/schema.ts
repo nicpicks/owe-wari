@@ -64,7 +64,13 @@ export const expenses = createTable('expenses', {
     paidByUserId: integer('paid_by_user_id')
         .references(() => users.id)
         .notNull(),
+    title: varchar('title', { length: 256 }).notNull(),
     amount: numeric('amount').notNull(),
+    category: varchar('category', { length: 256 }),
+    notes: varchar('notes', { length: 256 }),
+    expenseDate: timestamp('expense_date', { withTimezone: true })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
