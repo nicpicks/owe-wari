@@ -10,7 +10,7 @@ export default function CreateGroup() {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [currency, setCurrency] = useState('SGD')
-    const [members, setMembers] = useState(['Alice', 'Bob', 'Carlsten'])
+    const [members, setMembers] = useState([''])
 
     const createGroup = api.group.create.useMutation({
         onSuccess: (data) => {
@@ -25,6 +25,7 @@ export default function CreateGroup() {
             name,
             currency,
             description,
+            userNames: members,
         })
     }
 
@@ -82,12 +83,18 @@ export default function CreateGroup() {
                     <h2 className="mb-4 font-bold text-primary text-xl">
                         Members
                     </h2>
-                    {members.map((_, index) => (
+                    {members.map((member, index) => (
                         <div key={index} className="mb-2 flex items-center">
                             <input
                                 className="flex-grow rounded border p-2"
                                 type="text"
                                 placeholder={`Participant ${index + 1}`}
+                                value={member}
+                                onChange={(e) => {
+                                    const newMembers = [...members]
+                                    newMembers[index] = e.target.value
+                                    setMembers(newMembers)
+                                }}
                             />
                             <button
                                 className="ml-2 rounded bg-primary border p-2"

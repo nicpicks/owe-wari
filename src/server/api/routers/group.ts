@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
-import { groups } from '~/server/db/schema'
+import { groups, users, groupMembers } from '~/server/db/schema'
 import { ulid } from 'ulid'
 
 export const groupRouter = createTRPCRouter({
@@ -11,6 +11,7 @@ export const groupRouter = createTRPCRouter({
                 name: z.string().min(1),
                 currency: z.string().min(1),
                 description: z.string(),
+                userNames: z.array(z.string().min(1)),
             })
         )
         .mutation(async ({ ctx, input }) => {
@@ -25,21 +26,24 @@ export const groupRouter = createTRPCRouter({
                         description: input.description,
                     })
                     .returning({ id: groups.id })
+
+                for (const userName of input.userNames) {
+                    const userId = ulid()
+
+                    await ctx.db.insert(users).values({
+                        id: userId,
+                        name: userName,
+                    })
+                    await ctx.db.insert(groupMembers).values({
+                        groupId,
+                        userId,
+                    })
+                }
+
                 return { success: true, id: newGroup[0]?.id }
             } catch (error) {
                 console.error('Error inserting group:', error)
                 throw new Error('Failed to create group')
             }
         }),
-
-    getLatest: publicProcedure.query(async ({ ctx }) => {
-        try {
-            return await ctx.db.query.groups.findFirst({
-                orderBy: (groups, { desc }) => [desc(groups.createdAt)],
-            })
-        } catch (error) {
-            console.error('Error fetching latest group:', error)
-            throw new Error('Failed to fetch latest group')
-        }
-    }),
 })
