@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { eq } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import { groups, users, groupMembers } from '~/server/db/schema'
@@ -44,6 +45,24 @@ export const groupRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error inserting group:', error)
                 throw new Error('Failed to create group')
+            }
+        }),
+
+    getUsers: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const usersInGroup = await ctx.db
+                    .select({ id: users.id, name: users.name })
+                    .from(users)
+                    .innerJoin(groupMembers, eq(users.id, groupMembers.userId))
+                    .where(eq(groupMembers.groupId, input.groupId))
+                    .execute()
+
+                return usersInGroup
+            } catch (error) {
+                console.error('Error fetching users:', error)
+                throw new Error('Failed to fetch users')
             }
         }),
 })

@@ -7,8 +7,8 @@ export const expenseRouter = createTRPCRouter({
     create: publicProcedure
         .input(
             z.object({
-                groupId: z.number(),
-                paidByUserId: z.number(),
+                groupId: z.string(),
+                paidByUserId: z.string(),
                 title: z.string().min(1),
                 amount: z.number(),
                 category: z.string().optional(),

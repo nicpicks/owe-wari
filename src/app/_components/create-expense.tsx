@@ -1,20 +1,54 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { api } from '~/trpc/react'
+
+interface User {
+    id: string
+    name: string
+}
 
 export default function CreateExpense() {
     const router = useRouter()
     const pathname = usePathname()
     const groupId = pathname.split('/')[2]?.toString()
+
     const [title, setTitle] = useState('')
     const [amount, setAmount] = useState(0)
     const [expenseDate, setExpenseDate] = useState(new Date())
     const [category, setCategory] = useState('General')
-    const [paidByUserId, setPaidByUserId] = useState(0)
+    const [paidByUserId, setPaidByUserId] = useState('')
     const [notes, setNotes] = useState('')
+    const [users, setUsers] = useState<User[]>([])
+    const [isChecked, setIsChecked] = useState<Record<string, boolean>>({})
+
+    // to-do: fetch default payee from group settings
+    const defaultPayee = users[0]
+
+    const {
+        data: usersData,
+        error: usersError,
+        isLoading: usersLoading,
+    } = api.group.getUsers.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId }
+    )
+
+    useEffect(() => {
+        if (usersData) {
+            setUsers(usersData)
+            const initialCheckedStatus: Record<string, boolean> = {}
+            users.forEach((user) => {
+                initialCheckedStatus[user.id] = true
+            })
+            setIsChecked(initialCheckedStatus)
+        }
+        if (usersError) {
+            console.error('Error fetching users:', usersError)
+        }
+    }, [usersData, usersError])
 
     const createExpense = api.expense.create.useMutation({
         onSuccess: (data) => {
@@ -29,10 +63,10 @@ export default function CreateExpense() {
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
-        const groupIdNumber: number = Number(groupId)
+
         createExpense.mutate({
             title,
-            groupId: groupIdNumber,
+            groupId: groupId || '',
             paidByUserId,
             amount,
             category,
@@ -61,7 +95,7 @@ export default function CreateExpense() {
                                 Expense title
                             </label>
                             <input
-                                className="mb-2 w-full rounded border p-2 text"
+                                className="mb-2 w-full rounded border p-2 text input input-bordered text-lg"
                                 type="text"
                                 placeholder="Grab ride from airport"
                                 value={title}
@@ -76,7 +110,7 @@ export default function CreateExpense() {
                                 Amount
                             </label>
                             <input
-                                className="mb-2 w-full rounded border p-2 text"
+                                className="mb-2 w-full rounded border p-2 text input input-bordered"
                                 type="number"
                                 placeholder="Amount"
                                 value={amount}
@@ -95,7 +129,7 @@ export default function CreateExpense() {
                                 Expense date
                             </label>
                             <input
-                                className="mb-2 w-full rounded border p-2 text"
+                                className="mb-2 w-full rounded border p-2 text input input-bordered"
                                 type="date"
                                 value={expenseDate.toISOString().split('T')[0]}
                                 onChange={(e) =>
@@ -113,7 +147,7 @@ export default function CreateExpense() {
                             <select
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="rounde mb-2 w-full border p-2 text"
+                                className="mb-2 w-full rounded border p-2 text select select-black text-lg"
                             >
                                 <option value="General" disabled selected>
                                     General
@@ -136,15 +170,19 @@ export default function CreateExpense() {
                             >
                                 Paid by
                             </label>
-                            <input
-                                className="mb-2 w-full rounded border p-2 text"
-                                type="text"
+                            <select
+                                className="mb-2 w-full rounded border p-2 text select select-black text-lg"
                                 value={paidByUserId}
                                 onChange={(e) =>
-                                    setPaidByUserId(Number(e.target.value))
+                                    setPaidByUserId(e.target.value)
                                 }
-                                placeholder="Paid by"
-                            />
+                            >
+                                {users.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div className="w-full">
                             <label
@@ -154,7 +192,7 @@ export default function CreateExpense() {
                                 Notes
                             </label>
                             <textarea
-                                className="w-full rounded border p-2"
+                                className="w-full rounded border p-2 textarea textarea-bordered text-lg"
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                             ></textarea>
@@ -166,6 +204,29 @@ export default function CreateExpense() {
                     <h2 className="mb-4 font-bold text-primary text-2xl">
                         Paid for
                     </h2>
+                    {usersLoading && <p>Loading group members...</p>}
+                    {users.map((user, index) => (
+                        <div
+                            key={user.id}
+                            className={`flex items-center py-3 ${index !== users.length - 1 ? 'border-b border-gray-300' : ''}`}
+                        >
+                            <input
+                                type="checkbox"
+                                id={user.id}
+                                name={user.name}
+                                value={user.id}
+                                className="mr-3 checkbox checkbox-primary"
+                                checked={isChecked[user.id]}
+                                onChange={() =>
+                                    setIsChecked({
+                                        ...isChecked,
+                                        [user.id]: !isChecked[user.id],
+                                    })
+                                }
+                            />
+                            <label htmlFor={user.id}>{user.name}</label>
+                        </div>
+                    ))}
                 </div>
 
                 <div className="flex gap-2">
