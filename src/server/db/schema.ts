@@ -23,12 +23,12 @@ import {
 export const createTable = pgTableCreator((name) => `owe-wari_${name}`)
 
 export const users = createTable('users', {
-    id: serial('id').primaryKey().notNull(),
+    id: varchar('id', { length: 26 }).primaryKey().notNull(),
     name: varchar('name', { length: 256 }).notNull(),
 })
 
 export const groups = createTable('groups', {
-    id: serial('id').primaryKey().notNull(),
+    id: varchar('id', { length: 26 }).primaryKey().notNull(),
     name: varchar('name', { length: 256 }).notNull(),
     description: varchar('description', { length: 256 }),
     currency: varchar('currency', { length: 3 }).notNull(),
@@ -42,10 +42,10 @@ export const groups = createTable('groups', {
 
 export const groupMembers = createTable('group_members', {
     id: serial('id').primaryKey().notNull(),
-    groupId: integer('group_id')
+    groupId: varchar('group_id', { length: 26 })
         .references(() => groups.id)
         .notNull(),
-    userId: integer('user_id')
+    userId: varchar('user_id', { length: 26 })
         .references(() => users.id)
         .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -58,10 +58,10 @@ export const groupMembers = createTable('group_members', {
 
 export const expenses = createTable('expenses', {
     id: serial('id').primaryKey().notNull(),
-    groupId: integer('group_id')
+    groupId: varchar('group_id', { length: 26 })
         .references(() => groups.id)
         .notNull(),
-    paidByUserId: integer('paid_by_user_id')
+    paidByUserId: varchar('paid_by_user_id', { length: 26 })
         .references(() => users.id)
         .notNull(),
     title: varchar('title', { length: 256 }).notNull(),
@@ -84,7 +84,7 @@ export const expenseSplits = createTable('expense_splits', {
     expenseId: integer('expense_id')
         .references(() => expenses.id)
         .notNull(),
-    userId: integer('user_id')
+    userId: varchar('user_id', { length: 26 })
         .references(() => users.id)
         .notNull(),
     amount: numeric('amount').notNull(),

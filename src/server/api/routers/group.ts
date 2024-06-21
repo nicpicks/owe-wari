@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import { groups } from '~/server/db/schema'
+import { ulid } from 'ulid'
 
 export const groupRouter = createTRPCRouter({
     create: publicProcedure
@@ -14,9 +15,11 @@ export const groupRouter = createTRPCRouter({
         )
         .mutation(async ({ ctx, input }) => {
             try {
+                const groupId = ulid()
                 const newGroup = await ctx.db
                     .insert(groups)
                     .values({
+                        id: groupId,
                         name: input.name,
                         currency: input.currency,
                         description: input.description,
