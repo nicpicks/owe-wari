@@ -45,68 +45,103 @@ export default function CreateGroup() {
                         Group Information
                     </h2>
                     <div className="mb-4 flex space-x-4">
-                        <input
-                            className="mb-2 w-full rounded border p-2 text"
-                            type="text"
-                            placeholder="Group Name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                        />
-                        <select
-                            value={currency}
-                            onChange={(e) => setCurrency(e.target.value)}
-                            className="rounde mb-2 w-full border p-2 text"
-                        >
-                            <option value="" disabled selected>
+                        <div className="w-full">
+                            <label
+                                htmlFor="Group Name"
+                                className="block p-1 text-m font-medium text-gray-600"
+                            >
+                                Group Name
+                            </label>
+                            <input
+                                className="mb-2 w-full rounded border p-2 text input input-bordered"
+                                type="text"
+                                placeholder="Group Name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </div>
+                        <div className="w-full">
+                            <label
+                                htmlFor="Currency"
+                                className="block p-1 text-m font-medium text-gray-600"
+                            >
                                 Currency
-                            </option>
-                            <option value="SGD">SGD</option>
-                            <option value="AUD">AUD</option>
-                            <option value="USD">USD</option>
-                            <option value="EUR">EUR</option>
-                            <option value="JPY">JPY</option>
-                            <option value="KRW">KRW</option>
-                            <option value="MYR">MYR</option>
-                            <option value="IDR">IDR</option>
-                            <option value="VND">VND</option>
-                        </select>
+                            </label>
+                            <select
+                                value={currency}
+                                onChange={(e) => setCurrency(e.target.value)}
+                                className="rounde mb-2 w-full border p-2 text select select-bordered"
+                            >
+                                <option value="" disabled selected>
+                                    Currency
+                                </option>
+                                <option value="SGD">SGD</option>
+                                <option value="AUD">AUD</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="JPY">JPY</option>
+                                <option value="KRW">KRW</option>
+                                <option value="MYR">MYR</option>
+                                <option value="IDR">IDR</option>
+                                <option value="VND">VND</option>
+                            </select>
+                        </div>
                     </div>
-                    <textarea
-                        className="w-full rounded border p-2"
-                        placeholder="Description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                    ></textarea>
+                    <div className="w-full">
+                        <label
+                            htmlFor="Description"
+                            className="block p-1 text-m font-medium text-gray-600"
+                        >
+                            Description
+                        </label>
+                        <textarea
+                            className="w-full rounded border p-2 input input-bordered"
+                            placeholder="Description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                        ></textarea>
+                    </div>
                 </div>
 
                 <div className="mb-4 rounded-lg bg-gray-200 p-4">
                     <h2 className="mb-4 font-bold text-primary text-xl">
                         Members
                     </h2>
-                    {members.map((member, index) => (
-                        <div key={index} className="mb-2 flex items-center">
-                            <input
-                                className="flex-grow rounded border p-2"
-                                type="text"
-                                placeholder={`Participant ${index + 1}`}
-                                value={member}
-                                onChange={(e) => {
-                                    const newMembers = [...members]
-                                    newMembers[index] = e.target.value
-                                    setMembers(newMembers)
-                                }}
-                            />
-                            <button
-                                className="ml-2 rounded bg-primary border p-2"
-                                onClick={() => removeMember(index)}
-                            >
-                                <img
-                                    style={{ width: '22px', height: '22px' }}
-                                    src="/icons/delete.png"
+                    <div className="w-full">
+                        <label
+                            htmlFor="Group Members"
+                            className="block p-1 text-m font-medium text-gray-600"
+                        >
+                            Who will be in this group?
+                        </label>
+                        {members.map((member, index) => (
+                            <div key={index} className="mb-2 flex items-center">
+                                <input
+                                    className="flex-grow rounded border p-2 input input-bordered"
+                                    type="text"
+                                    placeholder={`Participant ${index + 1}`}
+                                    value={member}
+                                    onChange={(e) => {
+                                        const newMembers = [...members]
+                                        newMembers[index] = e.target.value
+                                        setMembers(newMembers)
+                                    }}
                                 />
-                            </button>
-                        </div>
-                    ))}
+                                <button
+                                    className="ml-2 rounded bg-primary border p-2"
+                                    onClick={() => removeMember(index)}
+                                >
+                                    <img
+                                        style={{
+                                            width: '22px',
+                                            height: '22px',
+                                        }}
+                                        src="/icons/delete.png"
+                                    />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                     <button
                         className="mt-2 rounded bg-primary border p-2 text-white hover:bg-accent"
                         onClick={addMember}
@@ -119,13 +154,21 @@ export default function CreateGroup() {
                     <h2 className="mb-4 font-bold text-primary text-xl">
                         Payment Settings
                     </h2>
-                    <select className="w-full rounded border p-2">
-                        {members.map((_, index) => (
-                            <option key={index} value={index}>
-                                Participant {index + 1}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="w-full">
+                        <label
+                            htmlFor="Default Payee"
+                            className="block p-1 text-m font-medium text-gray-600"
+                        >
+                            Nominated Cash Cow
+                        </label>
+                        <select className="w-full rounded border p-2 select select-bordered">
+                            {members.map((_, index) => (
+                                <option key={index} value={index}>
+                                    Participant {index + 1}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <button
