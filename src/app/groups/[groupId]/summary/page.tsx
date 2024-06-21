@@ -1,47 +1,49 @@
-import { useEffect, useState } from 'react'
+'use client'
 
-const GroupSummaryPage = () => {
+import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
+
+const SummaryTab = ({ groupId }: { groupId: string }) => {
+    const router = useRouter()
+    const pathname = usePathname()
     const [totalExpenses, setTotalExpenses] = useState<number>(0)
     const [currentShare, setCurrentShare] = useState<number>(0)
     const [remainingOwed, setRemainingOwed] = useState<number>(0)
 
-    useEffect(() => {
-        // Fetch the total expenses, current share, and remaining owe from the API
-        // to-do: Replace the API endpoint with actual API endpoint
-        fetch('/api/group-summary')
-            .then((response) => response.json())
-            .then((data) => {
-                setTotalExpenses(data.totalExpenses)
-                setCurrentShare(data.currentShare)
-                setRemainingOwed(data.remainingOwe)
-            })
-            .catch((error) => {
-                console.error('Error fetching group summary:', error)
-            })
-    }, [])
-
     return (
-        <div className="card w-96 bg-primary text-primary-content">
-            <div className="card-body">
-                <h2 className="card-title">Group Summary</h2>
-                <p className="mb-4">Spending summary of the entire group.</p>
-                <div className="mb-4">
-                    <div className="text-muted-foreground">Total Expenses:</div>
-                    <div className="font-bold"> {totalExpenses}</div>
-                </div>
-                <div className="mb-4">
-                    <div className="text-muted-foreground">
-                        Your Current Share:
+        <div className="flex flex-col max-w-screen-md w-full mx-auto">
+            <div className="flex justify-center py-6">
+                <div className="card w-full bg-gray-200 text-primary-content ju">
+                    <div className="card-body">
+                        <h2 className="card-title text-primary text-2xl">
+                            Group Summary
+                        </h2>
+                        <p className="mb-6 text-gray-500">
+                            Spending summary of the entire group.
+                        </p>
+                        <div className="mb-4">
+                            <div className="text-primary mb-1">
+                                Total Expenses:
+                            </div>
+                            <div className="font-bold"> {totalExpenses}</div>
+                        </div>
+                        <div className="mb-4">
+                            <div className="text-primary mb-1">
+                                Your Current Share:
+                            </div>
+                            <div className="font-bold"> {currentShare}</div>
+                        </div>
+                        <div className="mb-4">
+                            <div className="text-primary mb-1">
+                                Remaining Owed:
+                            </div>
+                            <div className="font-bold"> {remainingOwed}</div>
+                        </div>
                     </div>
-                    <div className="font-bold"> {currentShare}</div>
-                </div>
-                <div className="mb-4">
-                    <div className="text-muted-foreground">Remaining Owed:</div>
-                    <div className="font-bold"> {remainingOwed}</div>
                 </div>
             </div>
         </div>
     )
 }
 
-export default GroupSummaryPage
+export default SummaryTab
