@@ -128,6 +128,7 @@ export default function CreateGroup() {
                                     }}
                                 />
                                 <button
+                                    type="button"
                                     className="ml-2 rounded bg-primary border p-2"
                                     onClick={() => removeMember(index)}
                                 >
@@ -143,6 +144,7 @@ export default function CreateGroup() {
                         ))}
                     </div>
                     <button
+                        type="button"
                         className="mt-2 rounded bg-primary border p-2 text-white hover:bg-accent"
                         onClick={addMember}
                     >
