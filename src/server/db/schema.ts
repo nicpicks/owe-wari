@@ -32,6 +32,9 @@ export const groups = createTable('groups', {
     name: varchar('name', { length: 256 }).notNull(),
     description: varchar('description', { length: 256 }),
     currency: varchar('currency', { length: 3 }).notNull(),
+    defaultPayee: varchar('default_payee', { length: 26 }).references(
+        () => users.id
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

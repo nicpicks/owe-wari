@@ -10,7 +10,8 @@ export default function CreateGroup() {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [currency, setCurrency] = useState('SGD')
-    const [members, setMembers] = useState([''])
+    const [members, setMembers] = useState(['', ''])
+    const [defaultPayee, setDefaultPayee] = useState('')
 
     const createGroup = api.group.create.useMutation({
         onSuccess: (data) => {
@@ -26,6 +27,7 @@ export default function CreateGroup() {
             currency,
             description,
             userNames: members,
+            defaultPayee,
         })
     }
 
@@ -35,6 +37,10 @@ export default function CreateGroup() {
 
     const removeMember = (index: number) => {
         setMembers(members.filter((_, i) => i !== index))
+    }
+
+    const handleMemberChange = (index: number, newName: string) => {
+        setMembers(members.map((name, i) => (i === index ? newName : name)))
     }
 
     return (
@@ -122,9 +128,10 @@ export default function CreateGroup() {
                                     placeholder={`Participant ${index + 1}`}
                                     value={member}
                                     onChange={(e) => {
-                                        const newMembers = [...members]
-                                        newMembers[index] = e.target.value
-                                        setMembers(newMembers)
+                                        handleMemberChange(
+                                            index,
+                                            e.target.value
+                                        )
                                     }}
                                 />
                                 <button
@@ -163,10 +170,14 @@ export default function CreateGroup() {
                         >
                             Nominated Cash Cow
                         </label>
-                        <select className="w-full rounded border p-2 select select-bordered">
-                            {members.map((_, index) => (
-                                <option key={index} value={index}>
-                                    Participant {index + 1}
+                        <select
+                            className="w-full rounded border p-2 select select-bordered"
+                            value={defaultPayee}
+                            onChange={(e) => setDefaultPayee(e.target.value)}
+                        >
+                            {members.map((member, index) => (
+                                <option key={index} value={member}>
+                                    {member || `Participant ${index + 1}`}
                                 </option>
                             ))}
                         </select>

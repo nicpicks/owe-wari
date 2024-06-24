@@ -13,6 +13,7 @@ export const groupRouter = createTRPCRouter({
                 currency: z.string().min(1),
                 description: z.string(),
                 userNames: z.array(z.string().min(1)),
+                defaultPayee: z.string(),
             })
         )
         .mutation(async ({ ctx, input }) => {
@@ -28,8 +29,14 @@ export const groupRouter = createTRPCRouter({
                     })
                     .returning({ id: groups.id })
 
+                let defaultPayeeId = ''
+
                 for (const userName of input.userNames) {
                     const userId = ulid()
+
+                    if (userName === input.defaultPayee) {
+                        defaultPayeeId = userId
+                    }
 
                     await ctx.db.insert(users).values({
                         id: userId,
@@ -39,6 +46,17 @@ export const groupRouter = createTRPCRouter({
                         groupId,
                         userId,
                     })
+                }
+
+                debugger
+                if (defaultPayeeId) {
+                    await ctx.db
+                        .update(groups)
+                        .set({
+                            defaultPayee: defaultPayeeId,
+                        })
+                        .where(eq(groups.id, groupId))
+                        .execute()
                 }
 
                 return { success: true, id: newGroup[0]?.id }
