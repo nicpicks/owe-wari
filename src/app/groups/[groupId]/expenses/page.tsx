@@ -126,7 +126,7 @@ const ExpensesTab = () => {
                                                     {expense.expenseDate.toLocaleDateString()}
                                                 </div>
                                                 <div>
-                                                    Notes: {expense.notes || ''}
+                                                    Notes: {expense.notes ?? ''}
                                                 </div>
                                             </div>
                                         </div>

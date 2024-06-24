@@ -66,7 +66,7 @@ export default function CreateExpense() {
 
         createExpense.mutate({
             title,
-            groupId: groupId || '',
+            groupId: groupId ?? '',
             paidByUserId,
             amount,
             category,
