@@ -16,7 +16,6 @@ export default function GroupPage() {
     const tabs = ['summary', 'expenses', 'balances', 'history', 'settings']
 
     const navigateToTab = (tab: string) => {
-        debugger
         router.push(`/groups/${groupId}/${tab}`)
     }
 

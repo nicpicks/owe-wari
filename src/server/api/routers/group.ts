@@ -48,7 +48,6 @@ export const groupRouter = createTRPCRouter({
                     })
                 }
 
-                debugger
                 if (defaultPayeeId) {
                     await ctx.db
                         .update(groups)
@@ -81,6 +80,23 @@ export const groupRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error fetching users:', error)
                 throw new Error('Failed to fetch users')
+            }
+        }),
+
+    getDefaultPayee: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const group = await ctx.db
+                    .select({ defaultPayee: groups.defaultPayee })
+                    .from(groups)
+                    .where(eq(groups.id, input.groupId))
+                    .execute()
+
+                return group[0]?.defaultPayee
+            } catch (error) {
+                console.error('Error fetching default payee:', error)
+                throw new Error('Failed to fetch default payee')
             }
         }),
 })

@@ -24,8 +24,10 @@ export default function CreateExpense() {
     const [users, setUsers] = useState<User[]>([])
     const [isChecked, setIsChecked] = useState<Record<string, boolean>>({})
 
-    // to-do: fetch default payee from group settings
-    const defaultPayee = users[0]
+    const { data: defaultPayee } = api.group.getDefaultPayee.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId }
+    )
 
     const {
         data: usersData,
@@ -44,6 +46,10 @@ export default function CreateExpense() {
                 initialCheckedStatus[user.id] = true
             })
             setIsChecked(initialCheckedStatus)
+
+            if (defaultPayee) {
+                setPaidByUserId(defaultPayee)
+            }
         }
         if (usersError) {
             console.error('Error fetching users:', usersError)
@@ -178,7 +184,11 @@ export default function CreateExpense() {
                                 }
                             >
                                 {users.map((user) => (
-                                    <option key={user.id} value={user.id}>
+                                    <option
+                                        key={user.id}
+                                        value={user.id}
+                                        selected={user.id === defaultPayee}
+                                    >
                                         {user.name}
                                     </option>
                                 ))}
