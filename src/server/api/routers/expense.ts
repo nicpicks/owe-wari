@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import { expenses } from '~/server/db/schema'
@@ -58,6 +58,23 @@ export const expenseRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error getting expenses:', error)
                 throw new Error('Failed to get expenses')
+            }
+        }),
+
+    getTotalExpenseCost: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const totalExpenseCost = await ctx.db
+                    .select({ total: sql<number>`SUM(${expenses.amount})` })
+                    .from(expenses)
+                    .where(eq(expenses.groupId, input.groupId))
+                    .execute()
+
+                return totalExpenseCost[0]?.total ?? 0
+            } catch (error) {
+                console.error('Error getting total expense cost:', error)
+                throw new Error('Failed to get total expense cost')
             }
         }),
 })
