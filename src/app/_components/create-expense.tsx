@@ -153,7 +153,7 @@ export default function CreateExpense() {
                             <select
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="mb-2 w-full rounded border p-2 text select select-black text-lg"
+                                className="mb-2 w-full rounded border p-2 text select select-bordered text-lg"
                             >
                                 <option value="General" disabled selected>
                                     General
@@ -177,7 +177,7 @@ export default function CreateExpense() {
                                 Paid by
                             </label>
                             <select
-                                className="mb-2 w-full rounded border p-2 text select select-black text-lg"
+                                className="mb-2 w-full rounded border p-2 text select select-bordered text-lg"
                                 value={paidByUserId}
                                 onChange={(e) =>
                                     setPaidByUserId(e.target.value)
