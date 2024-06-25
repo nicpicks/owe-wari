@@ -99,4 +99,28 @@ export const groupRouter = createTRPCRouter({
                 throw new Error('Failed to fetch default payee')
             }
         }),
+
+    updateDefaultPayee: publicProcedure
+        .input(z.object({ groupId: z.string(), defaultPayee: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                const result = await ctx.db
+                    .update(groups)
+                    .set({ defaultPayee: input.defaultPayee })
+                    .where(eq(groups.id, input.groupId))
+                    .execute()
+
+                if (!result) {
+                    throw new Error('No group found with the provided ID')
+                }
+
+                return {
+                    success: true,
+                    message: 'Default payee updated successfully',
+                }
+            } catch (error) {
+                console.error('Error updating default payee', error)
+                throw new Error('Failed to update default payee')
+            }
+        }),
 })
