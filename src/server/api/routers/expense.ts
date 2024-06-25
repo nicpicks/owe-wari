@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
-import { expenses } from '~/server/db/schema'
+import { expenses, expenseSplits, groupMembers } from '~/server/db/schema'
 
 export const expenseRouter = createTRPCRouter({
     create: publicProcedure
@@ -19,15 +19,46 @@ export const expenseRouter = createTRPCRouter({
         )
         .mutation(async ({ ctx, input }) => {
             try {
-                await ctx.db.insert(expenses).values({
-                    groupId: input.groupId,
-                    paidByUserId: input.paidByUserId,
-                    title: input.title,
-                    // check this why i need toString here
-                    amount: input.amount.toString(),
-                    category: input.category,
-                    notes: input.notes,
-                    expenseDate: input.expenseDate,
+                await ctx.db.transaction(async (trx) => {
+                    const [newExpense] = await trx
+                        .insert(expenses)
+                        .values({
+                            groupId: input.groupId,
+                            paidByUserId: input.paidByUserId,
+                            title: input.title,
+                            // check this why i need toString here
+                            amount: input.amount.toString(),
+                            category: input.category,
+                            notes: input.notes,
+                            expenseDate: input.expenseDate,
+                        })
+                        .returning({ id: expenses.id })
+                        .execute()
+                    if (!newExpense || !newExpense.id) {
+                        throw new Error('Failed to create expense')
+                    }
+                    const expenseId = newExpense.id
+                    const members = await trx
+                        .select({ userId: groupMembers.userId })
+                        .from(groupMembers)
+                        .where(eq(groupMembers.groupId, input.groupId))
+                        .execute()
+                    if (members.length === 0) {
+                        throw new Error('no group members found')
+                    }
+
+                    // Assuming equal splitting
+                    const splitAmount = input.amount / members.length
+                    await trx
+                        .insert(expenseSplits)
+                        .values(
+                            members.map((member) => ({
+                                expenseId,
+                                userId: member.userId,
+                                amount: splitAmount.toString(),
+                            }))
+                        )
+                        .execute()
                 })
 
                 return { success: true, id: input.groupId }
