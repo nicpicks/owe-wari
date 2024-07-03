@@ -34,7 +34,7 @@ export const expenseRouter = createTRPCRouter({
                         })
                         .returning({ id: expenses.id })
                         .execute()
-                    if (!newExpense || !newExpense.id) {
+                    if (!newExpense?.id) {
                         throw new Error('Failed to create expense')
                     }
                     const expenseId = newExpense.id
