@@ -12,13 +12,26 @@ export default function CreateGroup() {
     const [currency, setCurrency] = useState('SGD')
     const [members, setMembers] = useState(['', ''])
     const [defaultPayee, setDefaultPayee] = useState('')
+    const [createdGroupId, setCreatedGroupId] = useState<string | null>(null)
+    const [copied, setCopied] = useState(false)
 
     const createGroup = api.group.create.useMutation({
         onSuccess: (data) => {
-            const groupId = data.id
-            router.push(`/groups/${groupId}/summary`)
+            setCreatedGroupId(data.id ?? null)
         },
     })
+
+    const handleCopyLink = () => {
+        if (!createdGroupId) return
+        const url = `${window.location.origin}/groups/${createdGroupId}`
+        void navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
+
+    const handleGoToGroup = () => {
+        if (createdGroupId) router.push(`/groups/${createdGroupId}/summary`)
+    }
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
@@ -41,6 +54,42 @@ export default function CreateGroup() {
 
     const handleMemberChange = (index: number, newName: string) => {
         setMembers(members.map((name, i) => (i === index ? newName : name)))
+    }
+
+    if (createdGroupId) {
+        return (
+            <div className="mx-auto flex w-full max-w-screen-md flex-1 flex-col bg-white p-6">
+                <div className="mb-4 rounded-lg bg-gray-200 p-6 text-center">
+                    <h2 className="mb-2 font-bold text-primary text-2xl">
+                        Group created!
+                    </h2>
+                    <p className="mb-4 text-gray-600">
+                        Share this link with your group members so they can join.
+                    </p>
+                    <div className="mb-4 flex items-center gap-2">
+                        <input
+                            readOnly
+                            className="input input-bordered flex-1 text-sm"
+                            value={`${window.location.origin}/groups/${createdGroupId}`}
+                        />
+                        <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={handleCopyLink}
+                        >
+                            {copied ? 'Copied!' : 'Copy link'}
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        className="btn btn-primary w-full"
+                        onClick={handleGoToGroup}
+                    >
+                        Go to group
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     return (

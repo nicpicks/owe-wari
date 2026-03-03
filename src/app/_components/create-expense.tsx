@@ -42,7 +42,7 @@ export default function CreateExpense() {
         if (usersData) {
             setUsers(usersData)
             const initialCheckedStatus: Record<string, boolean> = {}
-            users.forEach((user) => {
+            usersData.forEach((user) => {
                 initialCheckedStatus[user.id] = true
             })
             setIsChecked(initialCheckedStatus)
@@ -70,6 +70,10 @@ export default function CreateExpense() {
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
 
+        const splitUserIds = Object.entries(isChecked)
+            .filter(([, checked]) => checked)
+            .map(([userId]) => userId)
+
         createExpense.mutate({
             title,
             groupId: groupId ?? '',
@@ -78,6 +82,7 @@ export default function CreateExpense() {
             category,
             notes,
             expenseDate,
+            splitUserIds,
         })
     }
 

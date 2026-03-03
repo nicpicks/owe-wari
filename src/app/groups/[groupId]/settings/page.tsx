@@ -17,6 +17,15 @@ const SettingsTab = () => {
     const groupId = pathname.split('/')[2]?.toString()
     const [defaultPayee, setDefaultPayee] = useState('')
     const [users, setUsers] = useState<User[]>([])
+    const [copied, setCopied] = useState(false)
+
+    const handleCopyLink = () => {
+        if (!groupId) return
+        const url = `${window.location.origin}/groups/${groupId}`
+        void navigator.clipboard.writeText(url)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+    }
 
     const navigateToTab = (tab: string) => {
         router.push(`/groups/${groupId}/${tab}`)
@@ -105,6 +114,29 @@ const SettingsTab = () => {
                                     ))}
                                 </select>
                             </div>
+                        <div className="mt-4">
+                            <label className="block p-1 text-m font-medium text-black">
+                                Invite Link
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    readOnly
+                                    className="input input-bordered flex-1 text-sm"
+                                    value={
+                                        groupId
+                                            ? `${typeof window !== 'undefined' ? window.location.origin : ''}/groups/${groupId}`
+                                            : ''
+                                    }
+                                />
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    onClick={handleCopyLink}
+                                >
+                                    {copied ? 'Copied!' : 'Copy link'}
+                                </button>
+                            </div>
+                        </div>
                         </div>
                     </div>
                 </div>

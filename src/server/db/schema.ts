@@ -1,9 +1,7 @@
 // Example model schema from the Drizzle docs
 // https://orm.drizzle.team/docs/sql-schema-declaration
 
-import { group } from 'console'
-import exp from 'constants'
-import { desc, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import {
     index,
     integer,
@@ -97,6 +95,23 @@ export const expenseSplits = createTable('expense_splits', {
     updatedAt: timestamp('updated_at', { withTimezone: true }).default(
         sql`CURRENT_TIMESTAMP`
     ),
+})
+
+export const settlements = createTable('settlements', {
+    id: serial('id').primaryKey().notNull(),
+    groupId: varchar('group_id', { length: 26 })
+        .references(() => groups.id)
+        .notNull(),
+    payerId: varchar('payer_id', { length: 26 })
+        .references(() => users.id)
+        .notNull(),
+    receiverId: varchar('receiver_id', { length: 26 })
+        .references(() => users.id)
+        .notNull(),
+    amount: numeric('amount').notNull(),
+    settledAt: timestamp('settled_at', { withTimezone: true })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
 })
 
 export const indexes = [

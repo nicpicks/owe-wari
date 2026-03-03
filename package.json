@@ -11,6 +11,7 @@
     "db:studio": "drizzle-kit studio",
     "dev": "next dev",
     "lint": "next lint",
+    "screenshot": "node scripts/screenshot.mjs",
     "start": "next start"
   },
   "dependencies": {
@@ -45,6 +46,7 @@
     "postcss": "^8.4.34",
     "prettier": "3.3.2",
     "prettier-plugin-tailwindcss": "^0.5.14",
+    "puppeteer": "^24.37.5",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.2"
   },
