@@ -2,7 +2,6 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-
 import { api } from '~/trpc/react'
 
 interface User {
@@ -29,11 +28,7 @@ export default function CreateExpense() {
         { enabled: !!groupId }
     )
 
-    const {
-        data: usersData,
-        error: usersError,
-        isLoading: usersLoading,
-    } = api.group.getUsers.useQuery(
+    const { data: usersData, error: usersError } = api.group.getUsers.useQuery(
         { groupId: groupId ?? '' },
         { enabled: !!groupId }
     )
@@ -41,26 +36,16 @@ export default function CreateExpense() {
     useEffect(() => {
         if (usersData) {
             setUsers(usersData)
-            const initialCheckedStatus: Record<string, boolean> = {}
-            usersData.forEach((user) => {
-                initialCheckedStatus[user.id] = true
-            })
-            setIsChecked(initialCheckedStatus)
-
-            if (defaultPayee) {
-                setPaidByUserId(defaultPayee)
-            }
+            const init: Record<string, boolean> = {}
+            usersData.forEach((u) => { init[u.id] = true })
+            setIsChecked(init)
+            if (defaultPayee) setPaidByUserId(defaultPayee)
         }
-        if (usersError) {
-            console.error('Error fetching users:', usersError)
-        }
+        if (usersError) console.error('Error fetching users:', usersError)
     }, [usersData, usersError])
 
     const createExpense = api.expense.create.useMutation({
-        onSuccess: (data) => {
-            const groupId = data.id
-            router.push(`/groups/${groupId}/expenses`)
-        },
+        onSuccess: (data) => router.push(`/groups/${data.id}/expenses`),
         onError: (error) => {
             console.error('Error creating expense:', error)
             alert('Failed to create expense')
@@ -69,198 +54,193 @@ export default function CreateExpense() {
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
-
         const splitUserIds = Object.entries(isChecked)
             .filter(([, checked]) => checked)
             .map(([userId]) => userId)
 
         createExpense.mutate({
-            title,
-            groupId: groupId ?? '',
-            paidByUserId,
-            amount,
-            category,
-            notes,
-            expenseDate,
-            splitUserIds,
+            title, groupId: groupId ?? '', paidByUserId,
+            amount, category, notes, expenseDate, splitUserIds,
         })
     }
 
-    const handleCancel = () => {
-        router.back()
-    }
+    const checkedCount = Object.values(isChecked).filter(Boolean).length
+    const splitAmount = checkedCount > 0 ? amount / checkedCount : 0
 
     return (
-        <form onSubmit={handleSubmit}>
-            <div className="mx-auto flex w-full max-w-screen-md flex-1 flex-col bg-white p-6">
-                <div className="mb-4 rounded-lg bg-gray-200 p-4">
-                    <h2 className="mb-4 font-bold text-primary text-2xl">
-                        Create Expense
-                    </h2>
-                    <div className="mb-4 flex space-x-4">
-                        <div className="w-full">
-                            <label
-                                htmlFor="title"
-                                className="block p-1 text-m font-medium text-black"
-                            >
-                                Expense title
-                            </label>
-                            <input
-                                className="mb-2 w-full rounded border p-2 text input input-bordered text-lg"
-                                type="text"
-                                placeholder="Grab ride from airport"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                            />
-                        </div>
-                        <div className="w-full">
-                            <label
-                                htmlFor="title"
-                                className="block p-1 text-m font-medium text-black"
-                            >
-                                Amount
-                            </label>
-                            <input
-                                className="mb-2 w-full rounded border p-2 text input input-bordered"
-                                type="text"
-                                placeholder="Amount"
-                                value={amount}
-                                onChange={(e) =>
-                                    setAmount(Number(e.target.value))
-                                }
-                            />
-                        </div>
-                    </div>
-                    <div className="mb-4 flex space-x-4">
-                        <div className="w-full">
-                            <label
-                                htmlFor="title"
-                                className="block p-1 text-m font-medium text-black"
-                            >
-                                Expense date
-                            </label>
-                            <input
-                                className="mb-2 w-full rounded border p-2 text input input-bordered"
-                                type="date"
-                                value={expenseDate.toISOString().split('T')[0]}
-                                onChange={(e) =>
-                                    setExpenseDate(new Date(e.target.value))
-                                }
-                            />
-                        </div>
-                        <div className="w-full">
-                            <label
-                                htmlFor="title"
-                                className="block p-1 text-m font-medium text-black"
-                            >
-                                Category
-                            </label>
-                            <select
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="mb-2 w-full rounded border p-2 text select select-bordered text-lg"
-                            >
-                                <option value="General" disabled selected>
-                                    General
-                                </option>
-                                <option value="Food">Food</option>
-                                <option value="Transport">Transport</option>
-                                <option value="Accomodation">
-                                    Accomodation
-                                </option>
-                                <option value="Groceries">Groceries</option>
-                                <option value="Others">Others</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="mb-4 flex space-x-4">
-                        <div className="w-full">
-                            <label
-                                htmlFor="title"
-                                className="block p-1 text-m font-medium text-black"
-                            >
-                                Paid by
-                            </label>
-                            <select
-                                className="mb-2 w-full rounded border p-2 text select select-bordered text-lg"
-                                value={paidByUserId}
-                                onChange={(e) =>
-                                    setPaidByUserId(e.target.value)
-                                }
-                            >
-                                {users.map((user) => (
-                                    <option
-                                        key={user.id}
-                                        value={user.id}
-                                        selected={user.id === defaultPayee}
-                                    >
-                                        {user.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="w-full">
-                            <label
-                                htmlFor="title"
-                                className="block p-1 text-m font-medium text-black"
-                            >
-                                Notes
-                            </label>
-                            <textarea
-                                className="w-full rounded border p-2 textarea textarea-bordered text-lg"
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                            ></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mb-4 rounded-lg bg-gray-200 p-4">
-                    <h2 className="mb-4 font-bold text-primary text-2xl">
-                        Paid for
-                    </h2>
-                    {usersLoading && <p>Loading group members...</p>}
-                    {users.map((user, index) => (
-                        <div
-                            key={user.id}
-                            className={`flex items-center py-3 ${index !== users.length - 1 ? 'border-b border-gray-300' : ''}`}
+        <div className="page-shell">
+            {/* Header */}
+            <div style={{ borderBottom: '1px solid var(--border)', padding: '1rem' }}>
+                <div className="page-container">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            style={{
+                                background: 'none', border: 'none',
+                                color: 'var(--dim)', cursor: 'pointer',
+                                padding: '0.25rem', display: 'flex', alignItems: 'center',
+                            }}
                         >
-                            <input
-                                type="checkbox"
-                                id={user.id}
-                                name={user.name}
-                                value={user.id}
-                                className="mr-3 checkbox checkbox-primary"
-                                checked={isChecked[user.id]}
-                                onChange={() =>
-                                    setIsChecked({
-                                        ...isChecked,
-                                        [user.id]: !isChecked[user.id],
-                                    })
-                                }
-                            />
-                            <label htmlFor={user.id}>{user.name}</label>
-                        </div>
-                    ))}
-                </div>
-
-                <div className="flex gap-2">
-                    <button
-                        type="submit"
-                        className="btn btn-primary"
-                        disabled={createExpense.isPending}
-                    >
-                        {createExpense.isPending ? 'Creating...' : 'Create'}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-gray"
-                        onClick={handleCancel}
-                    >
-                        Cancel
-                    </button>
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                                <path d="M11 4L6 9l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </button>
+                        <span style={{ fontFamily: 'var(--font-cormorant), serif', fontSize: '1.25rem', fontStyle: 'italic', color: 'var(--heading)' }}>
+                            Add expense
+                        </span>
+                    </div>
                 </div>
             </div>
-        </form>
+
+            <form onSubmit={handleSubmit}>
+                <div className="page-container" style={{ paddingTop: '2rem', paddingBottom: '3rem' }}>
+
+                    {/* Expense details */}
+                    <div className="card-dark anim-fade-up d-0" style={{ marginBottom: '1rem' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '1.25rem' }}>
+                            Expense details
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
+                            <div className="field-group" style={{ gridColumn: '1 / -1' }}>
+                                <label className="field-label">What for</label>
+                                <input
+                                    className="field-input"
+                                    type="text"
+                                    placeholder="Dinner at Shinjuku"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div className="field-group">
+                                <label className="field-label">Amount</label>
+                                <input
+                                    className="field-input"
+                                    type="number"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    value={amount || ''}
+                                    onChange={(e) => setAmount(Number(e.target.value))}
+                                    required
+                                    style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '1.0625rem' }}
+                                />
+                            </div>
+
+                            <div className="field-group">
+                                <label className="field-label">Date</label>
+                                <input
+                                    className="field-input"
+                                    type="date"
+                                    value={expenseDate.toISOString().split('T')[0]}
+                                    onChange={(e) => setExpenseDate(new Date(e.target.value))}
+                                />
+                            </div>
+
+                            <div className="field-group">
+                                <label className="field-label">Category</label>
+                                <select
+                                    className="field-select"
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                >
+                                    {['General', 'Food', 'Transport', 'Accommodation', 'Groceries', 'Others'].map((c) => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="field-group">
+                                <label className="field-label">Paid by</label>
+                                <select
+                                    className="field-select"
+                                    value={paidByUserId}
+                                    onChange={(e) => setPaidByUserId(e.target.value)}
+                                >
+                                    {users.map((u) => (
+                                        <option key={u.id} value={u.id}>{u.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="field-group" style={{ gridColumn: '1 / -1' }}>
+                                <label className="field-label">Notes</label>
+                                <textarea
+                                    className="field-textarea"
+                                    placeholder="Optional details…"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    style={{ minHeight: '64px' }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Split */}
+                    <div className="card-dark anim-fade-up d-1" style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                            <div>
+                                <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
+                                    Split between
+                                </div>
+                                <div className="section-sub">
+                                    {checkedCount > 0 && amount > 0
+                                        ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
+                                        : `${checkedCount} of ${users.length} selected`}
+                                </div>
+                            </div>
+                        </div>
+
+                        {users.length === 0 && (
+                            <p style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>Loading members…</p>
+                        )}
+
+                        {users.map((user) => (
+                            <div
+                                key={user.id}
+                                className="check-row"
+                                onClick={() =>
+                                    setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
+                                }
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={!!isChecked[user.id]}
+                                    onChange={() => {}}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <label style={{ flex: 1 }}>{user.name}</label>
+                                {isChecked[user.id] && amount > 0 && checkedCount > 0 && (
+                                    <span
+                                        className="font-mono"
+                                        style={{ fontSize: '0.875rem', color: 'var(--dim)' }}
+                                    >
+                                        ${splitAmount.toFixed(2)}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="anim-fade-up d-2" style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button
+                            type="submit"
+                            className="btn-amber"
+                            disabled={createExpense.isPending || checkedCount === 0}
+                            style={{ flex: 1, justifyContent: 'center', padding: '0.75rem' }}
+                        >
+                            {createExpense.isPending ? 'Adding…' : 'Add expense'}
+                        </button>
+                        <button type="button" className="btn-ghost" onClick={() => router.back()}>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
     )
 }
