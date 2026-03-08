@@ -163,6 +163,12 @@ export default function CreateExpense() {
         e.target.value = ''
     }
 
+    const updateLineItem = (id: string, patch: Partial<Pick<LineItem, 'name' | 'amount'>>) => {
+        setLineItems((prev) =>
+            prev.map((item) => item.id !== id ? item : { ...item, ...patch })
+        )
+    }
+
     const toggleLineItemParticipant = (itemId: string, userId: string) => {
         setLineItems((prev) =>
             prev.map((item) =>
@@ -410,27 +416,42 @@ export default function CreateExpense() {
                                     >
                                         {/* Item name + amount */}
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <span
+                                            <input
+                                                type="text"
+                                                value={item.name}
+                                                onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
                                                 style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    borderBottom: '1px solid var(--border-2)',
                                                     color: noParticipants ? 'var(--red)' : 'var(--body)',
                                                     fontSize: '0.875rem',
-                                                    display: 'block',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
+                                                    outline: 'none',
+                                                    padding: '0.125rem 0',
+                                                    width: '100%',
+                                                    fontFamily: 'var(--font-jakarta), sans-serif',
                                                 }}
-                                            >
-                                                {item.name}
-                                            </span>
-                                            <span
+                                            />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={item.amount || ''}
+                                                onChange={(e) => updateLineItem(item.id, { amount: parseFloat(e.target.value) || 0 })}
                                                 className="font-mono"
                                                 style={{
-                                                    fontSize: '0.8125rem',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    borderBottom: '1px solid var(--border-2)',
                                                     color: noParticipants ? 'var(--red)' : 'var(--dim)',
+                                                    fontSize: '0.8125rem',
+                                                    outline: 'none',
+                                                    padding: '0.125rem 0',
+                                                    width: '60px',
+                                                    textAlign: 'right',
+                                                    marginTop: '0.25rem',
                                                 }}
-                                            >
-                                                ${item.amount.toFixed(2)}
-                                            </span>
+                                            />
                                         </div>
 
                                         {/* Participant avatars */}
