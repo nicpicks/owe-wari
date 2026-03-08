@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Tabs from '~/app/_components/tabs'
+import { ExpenseDetailModal } from '~/app/_components/expense-detail-modal'
 import { api } from '~/trpc/react'
 
 interface Expense {
@@ -29,6 +30,7 @@ const ExpensesTab = () => {
     const pathname = usePathname()
     const groupId = pathname.split('/')[2]?.toString()
     const [expenses, setExpenses] = useState<Expense[]>([])
+    const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null)
 
     const { data: expensesData, error: expensesError } = api.expense.getExpenses.useQuery(
         { groupId: groupId ?? '' },
@@ -98,6 +100,8 @@ const ExpensesTab = () => {
                             return (
                                 <div
                                     key={expense.id}
+                                    onClick={() => setSelectedExpenseId(expense.id)}
+                                    className="cursor-pointer transition-colors hover:bg-white/5"
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -174,6 +178,11 @@ const ExpensesTab = () => {
                     </div>
                 )}
             </div>
+
+            <ExpenseDetailModal
+                expenseId={selectedExpenseId}
+                onClose={() => setSelectedExpenseId(null)}
+            />
         </div>
     )
 }
