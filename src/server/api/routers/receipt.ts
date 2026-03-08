@@ -17,7 +17,7 @@ export const receiptRouter = createTRPCRouter({
         .mutation(async ({ input }) => {
             const response = await client.messages.create({
                 model: 'claude-haiku-4-5-20251001',
-                max_tokens: 256,
+                max_tokens: 1024,
                 messages: [
                     {
                         role: 'user',
@@ -32,7 +32,15 @@ export const receiptRouter = createTRPCRouter({
                             },
                             {
                                 type: 'text',
-                                text: 'Extract the total amount due from this receipt, including all taxes and charges. Return ONLY valid JSON in this exact format: {"amount": <number>}. Use a plain number with no currency symbol. If no total is found, return {"amount": null}.',
+                                text: `Extract all line items and the final total from this receipt.
+Return ONLY valid JSON in this exact format:
+{"items":[{"name":"<item name>","amount":<number>}],"total":<number>}
+Rules:
+- Use plain numbers with no currency symbols
+- Omit quantities — if a line shows "2x Coffee $10.00", emit one item "Coffee" at 5.00
+- Include tax and service charge as separate line items if shown
+- If no items are found, use []
+- If no total is found, use null for total`,
                             },
                         ],
                     },
@@ -43,8 +51,12 @@ export const receiptRouter = createTRPCRouter({
                 response.content[0]?.type === 'text' ? response.content[0].text : ''
             const match = text.match(/\{[\s\S]*\}/)
             const parsed = JSON.parse(match?.[0] ?? '{}') as {
-                amount?: number | null
+                items?: { name: string; amount: number }[]
+                total?: number | null
             }
-            return { amount: parsed.amount ?? null }
+            return {
+                total: parsed.total ?? null,
+                items: parsed.items ?? [],
+            }
         }),
 })
