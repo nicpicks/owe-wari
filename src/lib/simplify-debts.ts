@@ -31,6 +31,16 @@ export function simplifyDebts(balances: Balance[]): Transfer[] {
     creditors.sort((a, b) => b.amount - a.amount)
     debtors.sort((a, b) => b.amount - a.amount)
 
+    // Normalize: if split-rounding caused sum(debtors) != sum(creditors),
+    // absorb the difference into the largest creditor so every debtor pays
+    // exactly their displayed balance.
+    const sumCreditors = Math.round(creditors.reduce((s, c) => s + c.amount, 0) * 100) / 100
+    const sumDebtors = Math.round(debtors.reduce((s, d) => s + d.amount, 0) * 100) / 100
+    const imbalance = Math.round((sumDebtors - sumCreditors) * 100) / 100
+    if (imbalance !== 0 && creditors[0]) {
+        creditors[0].amount = Math.round((creditors[0].amount + imbalance) * 100) / 100
+    }
+
     const transfers: Transfer[] = []
 
     let ci = 0
