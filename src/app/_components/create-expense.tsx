@@ -9,6 +9,24 @@ interface User {
     name: string
 }
 
+// ─── Line items (from receipt scan) ──────────────────────────────────────────
+
+interface LineItem {
+    id: string
+    name: string
+    amount: number
+    participantIds: string[]
+}
+
+function getInitials(name: string, allNames: string[]): string {
+    const first = name.trim()[0]?.toUpperCase() ?? '?'
+    const hasConflict = allNames.some(
+        (n) => n !== name && n.trim()[0]?.toUpperCase() === first
+    )
+    if (hasConflict) return name.trim().slice(0, 2).toUpperCase()
+    return first
+}
+
 // ─── Extensible split mode system ────────────────────────────────────────────
 
 type SplitMode = 'even' | 'manual'
@@ -72,6 +90,7 @@ export default function CreateExpense() {
     const [isChecked, setIsChecked] = useState<Record<string, boolean>>({})
     const [splitMode, setSplitMode] = useState<SplitMode>('even')
     const [manualAmounts, setManualAmounts] = useState<Record<string, number>>({})
+    const [lineItems, setLineItems] = useState<LineItem[]>([])
 
     const { data: defaultPayee } = api.group.getDefaultPayee.useQuery(
         { groupId: groupId ?? '' },
@@ -100,10 +119,21 @@ export default function CreateExpense() {
 
     const scanReceipt = api.receipt.scan.useMutation({
         onSuccess: (data) => {
-            if (data.amount !== null) {
-                setAmount(data.amount)
+            if (data.total !== null) {
+                setAmount(data.total)
             } else {
                 alert('Could not detect a total on this receipt. Please enter the amount manually.')
+            }
+            if (data.items.length > 0) {
+                const allIds = users.map((u) => u.id)
+                setLineItems(
+                    data.items.map((item, i) => ({
+                        id: String(i),
+                        name: item.name,
+                        amount: item.amount,
+                        participantIds: allIds,
+                    }))
+                )
             }
         },
         onError: () => {
@@ -125,15 +155,40 @@ export default function CreateExpense() {
         const reader = new FileReader()
         reader.onload = () => {
             const dataUrl = reader.result as string
-            // Strip the "data:<mime>;base64," prefix
             const base64 = dataUrl.split(',')[1]
             if (!base64) return
             scanReceipt.mutate({ imageBase64: base64, mimeType: file.type as ValidMime })
         }
         reader.readAsDataURL(file)
-        // Reset so the same file can be re-selected if needed
         e.target.value = ''
     }
+
+    const toggleLineItemParticipant = (itemId: string, userId: string) => {
+        setLineItems((prev) =>
+            prev.map((item) =>
+                item.id !== itemId ? item : {
+                    ...item,
+                    participantIds: item.participantIds.includes(userId)
+                        ? item.participantIds.filter((id) => id !== userId)
+                        : [...item.participantIds, userId],
+                }
+            )
+        )
+    }
+
+    // Compute per-user totals from line items (round up each share to nearest cent)
+    const lineItemTotals: Record<string, number> = {}
+    if (lineItems.length > 0) {
+        for (const item of lineItems) {
+            if (item.participantIds.length === 0) continue
+            const share = Math.ceil((item.amount / item.participantIds.length) * 100) / 100
+            for (const uid of item.participantIds) {
+                lineItemTotals[uid] = (lineItemTotals[uid] ?? 0) + share
+            }
+        }
+    }
+    const hasLineItems = lineItems.length > 0
+    const allItemsHaveParticipants = lineItems.every((item) => item.participantIds.length > 0)
 
     const createExpense = api.expense.create.useMutation({
         onSuccess: (data) => router.push(`/groups/${data.id}/expenses`),
@@ -145,11 +200,21 @@ export default function CreateExpense() {
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
-        const payload = activeModeConfig.toPayload(splitCtx)
-        createExpense.mutate({
-            title, groupId: groupId ?? '', paidByUserId,
-            amount, category, notes, expenseDate, ...payload,
-        })
+        if (hasLineItems) {
+            const splitAmounts = Object.entries(lineItemTotals)
+                .filter(([, v]) => v > 0)
+                .map(([userId, amt]) => ({ userId, amount: amt }))
+            createExpense.mutate({
+                title, groupId: groupId ?? '', paidByUserId,
+                amount, category, notes, expenseDate, splitAmounts,
+            })
+        } else {
+            const payload = activeModeConfig.toPayload(splitCtx)
+            createExpense.mutate({
+                title, groupId: groupId ?? '', paidByUserId,
+                amount, category, notes, expenseDate, ...payload,
+            })
+        }
     }
 
     const checkedCount = Object.values(isChecked).filter(Boolean).length
@@ -160,6 +225,10 @@ export default function CreateExpense() {
     const splitValid = activeModeConfig.validate(splitCtx)
     const manualTotal = Object.values(manualAmounts).reduce((s, v) => s + v, 0)
     const manualRemaining = amount - manualTotal
+
+    const allNames = users.map((u) => u.name)
+    const submitDisabled = createExpense.isPending
+        || (hasLineItems ? !allItemsHaveParticipants : !splitValid)
 
     return (
         <div className="page-shell">
@@ -303,122 +372,256 @@ export default function CreateExpense() {
                         </div>
                     </div>
 
+                    {/* Receipt line items */}
+                    {hasLineItems && (
+                        <div className="card-dark anim-fade-up d-1" style={{ marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
+                                    Receipt items
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setLineItems([])}
+                                    style={{
+                                        background: 'none', border: '1px solid var(--border-2)',
+                                        borderRadius: '6px', padding: '0.3125rem 0.625rem',
+                                        color: 'var(--dim)', fontSize: '0.75rem',
+                                        fontFamily: 'var(--font-jakarta), sans-serif',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Clear
+                                </button>
+                            </div>
+
+                            {lineItems.map((item) => {
+                                const noParticipants = item.participantIds.length === 0
+                                return (
+                                    <div
+                                        key={item.id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            paddingBottom: '0.75rem',
+                                            marginBottom: '0.75rem',
+                                            borderBottom: '1px solid var(--border)',
+                                            gap: '0.5rem',
+                                        }}
+                                    >
+                                        {/* Item name + amount */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <span
+                                                style={{
+                                                    color: noParticipants ? 'var(--red)' : 'var(--body)',
+                                                    fontSize: '0.875rem',
+                                                    display: 'block',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                {item.name}
+                                            </span>
+                                            <span
+                                                className="font-mono"
+                                                style={{
+                                                    fontSize: '0.8125rem',
+                                                    color: noParticipants ? 'var(--red)' : 'var(--dim)',
+                                                }}
+                                            >
+                                                ${item.amount.toFixed(2)}
+                                            </span>
+                                        </div>
+
+                                        {/* Participant avatars */}
+                                        <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                                            {users.map((user) => {
+                                                const selected = item.participantIds.includes(user.id)
+                                                const initials = getInitials(user.name, allNames)
+                                                return (
+                                                    <button
+                                                        key={user.id}
+                                                        type="button"
+                                                        onClick={() => toggleLineItemParticipant(item.id, user.id)}
+                                                        title={user.name}
+                                                        style={{
+                                                            width: '28px',
+                                                            height: '28px',
+                                                            borderRadius: '50%',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            fontFamily: 'var(--font-jakarta), sans-serif',
+                                                            fontSize: initials.length > 1 ? '0.5625rem' : '0.625rem',
+                                                            fontWeight: 600,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            flexShrink: 0,
+                                                            transition: 'background 0.15s, color 0.15s',
+                                                            background: selected ? 'var(--amber)' : 'var(--surface-3)',
+                                                            color: selected ? '#0B0B0B' : 'var(--muted)',
+                                                        }}
+                                                    >
+                                                        {initials}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+
+                            {/* Note if any item has no participants */}
+                            {!allItemsHaveParticipants && (
+                                <p style={{ fontSize: '0.75rem', color: 'var(--red)', marginTop: '0.25rem', margin: 0 }}>
+                                    Every item needs at least one participant.
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     {/* Split */}
-                    <div className="card-dark anim-fade-up d-1" style={{ marginBottom: '1.5rem' }}>
+                    <div className={`card-dark anim-fade-up ${hasLineItems ? 'd-2' : 'd-1'}`} style={{ marginBottom: '1.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                             <div>
                                 <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
                                     Split between
                                 </div>
                                 <div className="section-sub">
-                                    {splitMode === 'even'
-                                        ? checkedCount > 0 && amount > 0
-                                            ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
-                                            : `${checkedCount} of ${users.length} selected`
-                                        : amount > 0 && Math.abs(manualRemaining) < 0.01
-                                            ? 'All assigned'
-                                            : amount > 0
-                                                ? `$${Math.abs(manualRemaining).toFixed(2)} ${manualRemaining > 0 ? 'remaining' : 'over'}`
-                                                : 'Enter an amount above first'}
+                                    {hasLineItems
+                                        ? 'Totals from receipt items'
+                                        : splitMode === 'even'
+                                            ? checkedCount > 0 && amount > 0
+                                                ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
+                                                : `${checkedCount} of ${users.length} selected`
+                                            : amount > 0 && Math.abs(manualRemaining) < 0.01
+                                                ? 'All assigned'
+                                                : amount > 0
+                                                    ? `$${Math.abs(manualRemaining).toFixed(2)} ${manualRemaining > 0 ? 'remaining' : 'over'}`
+                                                    : 'Enter an amount above first'}
                                 </div>
                             </div>
-                            {/* Mode toggle */}
-                            <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
-                                {SPLIT_MODES.map(({ key, label }) => (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => setSplitMode(key)}
-                                        style={{
-                                            padding: '0.25rem 0.625rem',
-                                            fontSize: '0.75rem',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            fontFamily: 'var(--font-jakarta), sans-serif',
-                                            background: splitMode === key ? 'var(--surface-3)' : 'none',
-                                            color: splitMode === key ? 'var(--heading)' : 'var(--dim)',
-                                            transition: 'background 0.15s, color 0.15s',
-                                        }}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
+                            {/* Mode toggle — hidden when line items are active */}
+                            {!hasLineItems && (
+                                <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                                    {SPLIT_MODES.map(({ key, label }) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setSplitMode(key)}
+                                            style={{
+                                                padding: '0.25rem 0.625rem',
+                                                fontSize: '0.75rem',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                                background: splitMode === key ? 'var(--surface-3)' : 'none',
+                                                color: splitMode === key ? 'var(--heading)' : 'var(--dim)',
+                                                transition: 'background 0.15s, color 0.15s',
+                                            }}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {users.length === 0 && (
                             <p style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>Loading members…</p>
                         )}
 
-                        {splitMode === 'even'
-                            ? users.map((user) => (
-                                <div
-                                    key={user.id}
-                                    className="check-row"
-                                    onClick={() =>
-                                        setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
-                                    }
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={!!isChecked[user.id]}
-                                        onChange={() => {}}
-                                        onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <label style={{ flex: 1 }}>{user.name}</label>
-                                    {isChecked[user.id] && amount > 0 && checkedCount > 0 && (
+                        {hasLineItems
+                            ? users.map((user) => {
+                                const total = lineItemTotals[user.id] ?? 0
+                                return (
+                                    <div
+                                        key={user.id}
+                                        className="check-row"
+                                        style={{ cursor: 'default' }}
+                                    >
+                                        <label style={{ flex: 1 }}>{user.name}</label>
                                         <span
                                             className="font-mono"
-                                            style={{ fontSize: '0.875rem', color: 'var(--dim)' }}
+                                            style={{
+                                                fontSize: '0.875rem',
+                                                color: total > 0 ? 'var(--heading)' : 'var(--muted)',
+                                            }}
                                         >
-                                            ${splitAmount.toFixed(2)}
+                                            {total > 0 ? `$${total.toFixed(2)}` : '—'}
                                         </span>
-                                    )}
-                                </div>
-                            ))
-                            : users.map((user) => (
-                                <div
-                                    key={user.id}
-                                    className="check-row"
-                                    style={{ cursor: 'default' }}
-                                >
-                                    <label style={{ flex: 1 }}>{user.name}</label>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="0.00"
-                                        value={manualAmounts[user.id] || ''}
-                                        onChange={(e) =>
-                                            setManualAmounts({
-                                                ...manualAmounts,
-                                                [user.id]: parseFloat(e.target.value) || 0,
-                                            })
+                                    </div>
+                                )
+                            })
+                            : splitMode === 'even'
+                                ? users.map((user) => (
+                                    <div
+                                        key={user.id}
+                                        className="check-row"
+                                        onClick={() =>
+                                            setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
                                         }
-                                        className="font-mono"
-                                        style={{
-                                            width: '80px',
-                                            background: 'none',
-                                            border: 'none',
-                                            borderBottom: '1px solid var(--border-2)',
-                                            color: 'var(--heading)',
-                                            fontSize: '0.875rem',
-                                            textAlign: 'right',
-                                            outline: 'none',
-                                            padding: '0.125rem 0',
-                                        }}
-                                    />
-                                </div>
-                            ))
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={!!isChecked[user.id]}
+                                            onChange={() => {}}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <label style={{ flex: 1 }}>{user.name}</label>
+                                        {isChecked[user.id] && amount > 0 && checkedCount > 0 && (
+                                            <span
+                                                className="font-mono"
+                                                style={{ fontSize: '0.875rem', color: 'var(--dim)' }}
+                                            >
+                                                ${splitAmount.toFixed(2)}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))
+                                : users.map((user) => (
+                                    <div
+                                        key={user.id}
+                                        className="check-row"
+                                        style={{ cursor: 'default' }}
+                                    >
+                                        <label style={{ flex: 1 }}>{user.name}</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={manualAmounts[user.id] || ''}
+                                            onChange={(e) =>
+                                                setManualAmounts({
+                                                    ...manualAmounts,
+                                                    [user.id]: parseFloat(e.target.value) || 0,
+                                                })
+                                            }
+                                            className="font-mono"
+                                            style={{
+                                                width: '80px',
+                                                background: 'none',
+                                                border: 'none',
+                                                borderBottom: '1px solid var(--border-2)',
+                                                color: 'var(--heading)',
+                                                fontSize: '0.875rem',
+                                                textAlign: 'right',
+                                                outline: 'none',
+                                                padding: '0.125rem 0',
+                                            }}
+                                        />
+                                    </div>
+                                ))
                         }
                     </div>
 
                     {/* Actions */}
-                    <div className="anim-fade-up d-2" style={{ display: 'flex', gap: '0.75rem' }}>
+                    <div className={`anim-fade-up ${hasLineItems ? 'd-3' : 'd-2'}`} style={{ display: 'flex', gap: '0.75rem' }}>
                         <button
                             type="submit"
                             className="btn-amber"
-                            disabled={createExpense.isPending || !splitValid}
+                            disabled={submitDisabled}
                             style={{ flex: 1, justifyContent: 'center', padding: '0.75rem' }}
                         >
                             {createExpense.isPending ? 'Adding…' : 'Add expense'}
