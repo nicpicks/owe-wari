@@ -22,6 +22,10 @@ export const expenseRouter = createTRPCRouter({
                 notes: z.string().optional(),
                 expenseDate: z.date().optional(),
                 splitUserIds: z.array(z.string()).optional(),
+                splitAmounts: z.array(z.object({
+                    userId: z.string(),
+                    amount: z.number().positive(),
+                })).optional(),
             })
         )
         .mutation(async ({ ctx, input }) => {
@@ -58,17 +62,32 @@ export const expenseRouter = createTRPCRouter({
                         splitUserIds = members.map((m) => m.userId)
                     }
 
-                    const splitAmount = input.amount / splitUserIds.length
-                    await trx
-                        .insert(expenseSplits)
-                        .values(
-                            splitUserIds.map((userId) => ({
-                                expenseId,
-                                userId,
-                                amount: splitAmount.toString(),
-                            }))
-                        )
-                        .execute()
+                    if (input.splitAmounts && input.splitAmounts.length > 0) {
+                        // Manual (or any future explicit-amount mode)
+                        await trx
+                            .insert(expenseSplits)
+                            .values(
+                                input.splitAmounts.map(({ userId, amount }) => ({
+                                    expenseId,
+                                    userId,
+                                    amount: amount.toString(),
+                                }))
+                            )
+                            .execute()
+                    } else {
+                        // Even split
+                        const splitAmount = input.amount / splitUserIds.length
+                        await trx
+                            .insert(expenseSplits)
+                            .values(
+                                splitUserIds.map((userId) => ({
+                                    expenseId,
+                                    userId,
+                                    amount: splitAmount.toString(),
+                                }))
+                            )
+                            .execute()
+                    }
                 })
 
                 return { success: true, id: input.groupId }
