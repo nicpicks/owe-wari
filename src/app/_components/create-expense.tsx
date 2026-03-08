@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '~/trpc/react'
 
 interface User {
@@ -43,6 +43,45 @@ export default function CreateExpense() {
         }
         if (usersError) console.error('Error fetching users:', usersError)
     }, [usersData, usersError])
+
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const scanReceipt = api.receipt.scan.useMutation({
+        onSuccess: (data) => {
+            if (data.amount !== null) {
+                setAmount(data.amount)
+            } else {
+                alert('Could not detect a total on this receipt. Please enter the amount manually.')
+            }
+        },
+        onError: () => {
+            alert('Receipt scan failed. Please enter the amount manually.')
+        },
+    })
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
+        type ValidMime = (typeof validTypes)[number]
+        if (!validTypes.includes(file.type as ValidMime)) {
+            alert('Please select a JPEG, PNG, GIF, or WebP image.')
+            return
+        }
+
+        const reader = new FileReader()
+        reader.onload = () => {
+            const dataUrl = reader.result as string
+            // Strip the "data:<mime>;base64," prefix
+            const base64 = dataUrl.split(',')[1]
+            if (!base64) return
+            scanReceipt.mutate({ imageBase64: base64, mimeType: file.type as ValidMime })
+        }
+        reader.readAsDataURL(file)
+        // Reset so the same file can be re-selected if needed
+        e.target.value = ''
+    }
 
     const createExpense = api.expense.create.useMutation({
         onSuccess: (data) => router.push(`/groups/${data.id}/expenses`),
@@ -98,8 +137,38 @@ export default function CreateExpense() {
 
                     {/* Expense details */}
                     <div className="card-dark anim-fade-up d-0" style={{ marginBottom: '1rem' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '1.25rem' }}>
-                            Expense details
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
+                                Expense details
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={scanReceipt.isPending}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '0.375rem',
+                                    background: 'none', border: '1px solid var(--border-2)',
+                                    borderRadius: '6px', padding: '0.3125rem 0.625rem',
+                                    color: scanReceipt.isPending ? 'var(--muted)' : 'var(--dim)',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-jakarta), sans-serif',
+                                    cursor: scanReceipt.isPending ? 'default' : 'pointer',
+                                    transition: 'color 0.15s, border-color 0.15s',
+                                }}
+                            >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                    <circle cx="12" cy="13" r="4"/>
+                                </svg>
+                                {scanReceipt.isPending ? 'Scanning…' : 'Scan receipt'}
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                capture="environment"
+                                onChange={handleFileChange}
+                                style={{ display: 'none' }}
+                            />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
