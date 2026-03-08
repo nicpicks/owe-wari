@@ -9,6 +9,54 @@ interface User {
     name: string
 }
 
+// ─── Extensible split mode system ────────────────────────────────────────────
+
+type SplitMode = 'even' | 'manual'
+
+interface SplitModeContext {
+    users: User[]
+    amount: number
+    isChecked: Record<string, boolean>
+    manualAmounts: Record<string, number>
+}
+
+interface SplitPayload {
+    splitUserIds?: string[]
+    splitAmounts?: { userId: string; amount: number }[]
+}
+
+interface SplitModeConfig {
+    key: SplitMode
+    label: string
+    validate: (ctx: SplitModeContext) => boolean
+    toPayload: (ctx: SplitModeContext) => SplitPayload
+}
+
+const SPLIT_MODES: SplitModeConfig[] = [
+    {
+        key: 'even',
+        label: 'Even',
+        validate: ({ isChecked }) => Object.values(isChecked).some(Boolean),
+        toPayload: ({ isChecked }) => ({
+            splitUserIds: Object.entries(isChecked)
+                .filter(([, v]) => v)
+                .map(([id]) => id),
+        }),
+    },
+    {
+        key: 'manual',
+        label: 'Manual',
+        validate: ({ amount, manualAmounts }) =>
+            amount > 0 &&
+            Math.abs(Object.values(manualAmounts).reduce((s, v) => s + v, 0) - amount) < 0.01,
+        toPayload: ({ manualAmounts }) => ({
+            splitAmounts: Object.entries(manualAmounts)
+                .filter(([, v]) => v > 0)
+                .map(([userId, amount]) => ({ userId, amount })),
+        }),
+    },
+]
+
 export default function CreateExpense() {
     const router = useRouter()
     const pathname = usePathname()
@@ -22,6 +70,8 @@ export default function CreateExpense() {
     const [notes, setNotes] = useState('')
     const [users, setUsers] = useState<User[]>([])
     const [isChecked, setIsChecked] = useState<Record<string, boolean>>({})
+    const [splitMode, setSplitMode] = useState<SplitMode>('even')
+    const [manualAmounts, setManualAmounts] = useState<Record<string, number>>({})
 
     const { data: defaultPayee } = api.group.getDefaultPayee.useQuery(
         { groupId: groupId ?? '' },
@@ -37,8 +87,10 @@ export default function CreateExpense() {
         if (usersData) {
             setUsers(usersData)
             const init: Record<string, boolean> = {}
-            usersData.forEach((u) => { init[u.id] = true })
+            const initAmounts: Record<string, number> = {}
+            usersData.forEach((u) => { init[u.id] = true; initAmounts[u.id] = 0 })
             setIsChecked(init)
+            setManualAmounts(initAmounts)
             if (defaultPayee) setPaidByUserId(defaultPayee)
         }
         if (usersError) console.error('Error fetching users:', usersError)
@@ -93,18 +145,21 @@ export default function CreateExpense() {
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
-        const splitUserIds = Object.entries(isChecked)
-            .filter(([, checked]) => checked)
-            .map(([userId]) => userId)
-
+        const payload = activeModeConfig.toPayload(splitCtx)
         createExpense.mutate({
             title, groupId: groupId ?? '', paidByUserId,
-            amount, category, notes, expenseDate, splitUserIds,
+            amount, category, notes, expenseDate, ...payload,
         })
     }
 
     const checkedCount = Object.values(isChecked).filter(Boolean).length
     const splitAmount = checkedCount > 0 ? amount / checkedCount : 0
+
+    const activeModeConfig = SPLIT_MODES.find((m) => m.key === splitMode)!
+    const splitCtx: SplitModeContext = { users, amount, isChecked, manualAmounts }
+    const splitValid = activeModeConfig.validate(splitCtx)
+    const manualTotal = Object.values(manualAmounts).reduce((s, v) => s + v, 0)
+    const manualRemaining = amount - manualTotal
 
     return (
         <div className="page-shell">
@@ -256,10 +311,38 @@ export default function CreateExpense() {
                                     Split between
                                 </div>
                                 <div className="section-sub">
-                                    {checkedCount > 0 && amount > 0
-                                        ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
-                                        : `${checkedCount} of ${users.length} selected`}
+                                    {splitMode === 'even'
+                                        ? checkedCount > 0 && amount > 0
+                                            ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
+                                            : `${checkedCount} of ${users.length} selected`
+                                        : amount > 0 && Math.abs(manualRemaining) < 0.01
+                                            ? 'All assigned'
+                                            : amount > 0
+                                                ? `$${Math.abs(manualRemaining).toFixed(2)} ${manualRemaining > 0 ? 'remaining' : 'over'}`
+                                                : 'Enter an amount above first'}
                                 </div>
+                            </div>
+                            {/* Mode toggle */}
+                            <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                                {SPLIT_MODES.map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => setSplitMode(key)}
+                                        style={{
+                                            padding: '0.25rem 0.625rem',
+                                            fontSize: '0.75rem',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontFamily: 'var(--font-jakarta), sans-serif',
+                                            background: splitMode === key ? 'var(--surface-3)' : 'none',
+                                            color: splitMode === key ? 'var(--heading)' : 'var(--dim)',
+                                            transition: 'background 0.15s, color 0.15s',
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -267,31 +350,67 @@ export default function CreateExpense() {
                             <p style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>Loading members…</p>
                         )}
 
-                        {users.map((user) => (
-                            <div
-                                key={user.id}
-                                className="check-row"
-                                onClick={() =>
-                                    setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
-                                }
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={!!isChecked[user.id]}
-                                    onChange={() => {}}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                                <label style={{ flex: 1 }}>{user.name}</label>
-                                {isChecked[user.id] && amount > 0 && checkedCount > 0 && (
-                                    <span
+                        {splitMode === 'even'
+                            ? users.map((user) => (
+                                <div
+                                    key={user.id}
+                                    className="check-row"
+                                    onClick={() =>
+                                        setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
+                                    }
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={!!isChecked[user.id]}
+                                        onChange={() => {}}
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <label style={{ flex: 1 }}>{user.name}</label>
+                                    {isChecked[user.id] && amount > 0 && checkedCount > 0 && (
+                                        <span
+                                            className="font-mono"
+                                            style={{ fontSize: '0.875rem', color: 'var(--dim)' }}
+                                        >
+                                            ${splitAmount.toFixed(2)}
+                                        </span>
+                                    )}
+                                </div>
+                            ))
+                            : users.map((user) => (
+                                <div
+                                    key={user.id}
+                                    className="check-row"
+                                    style={{ cursor: 'default' }}
+                                >
+                                    <label style={{ flex: 1 }}>{user.name}</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={manualAmounts[user.id] || ''}
+                                        onChange={(e) =>
+                                            setManualAmounts({
+                                                ...manualAmounts,
+                                                [user.id]: parseFloat(e.target.value) || 0,
+                                            })
+                                        }
                                         className="font-mono"
-                                        style={{ fontSize: '0.875rem', color: 'var(--dim)' }}
-                                    >
-                                        ${splitAmount.toFixed(2)}
-                                    </span>
-                                )}
-                            </div>
-                        ))}
+                                        style={{
+                                            width: '80px',
+                                            background: 'none',
+                                            border: 'none',
+                                            borderBottom: '1px solid var(--border-2)',
+                                            color: 'var(--heading)',
+                                            fontSize: '0.875rem',
+                                            textAlign: 'right',
+                                            outline: 'none',
+                                            padding: '0.125rem 0',
+                                        }}
+                                    />
+                                </div>
+                            ))
+                        }
                     </div>
 
                     {/* Actions */}
@@ -299,7 +418,7 @@ export default function CreateExpense() {
                         <button
                             type="submit"
                             className="btn-amber"
-                            disabled={createExpense.isPending || checkedCount === 0}
+                            disabled={createExpense.isPending || !splitValid}
                             style={{ flex: 1, justifyContent: 'center', padding: '0.75rem' }}
                         >
                             {createExpense.isPending ? 'Adding…' : 'Add expense'}
