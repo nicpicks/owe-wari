@@ -400,60 +400,54 @@ export default function CreateExpense() {
                                 </button>
                             </div>
 
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {lineItems.map((item) => {
                                 const noParticipants = item.participantIds.length === 0
+                                const accent = noParticipants ? 'var(--red)' : undefined
                                 return (
                                     <div
                                         key={item.id}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            paddingBottom: '0.75rem',
-                                            marginBottom: '0.75rem',
-                                            borderBottom: '1px solid var(--border)',
-                                            gap: '0.5rem',
-                                        }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                     >
-                                        {/* Item name + amount */}
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <input
-                                                type="text"
-                                                value={item.name}
-                                                onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    borderBottom: '1px solid var(--border-2)',
-                                                    color: noParticipants ? 'var(--red)' : 'var(--body)',
-                                                    fontSize: '0.875rem',
-                                                    outline: 'none',
-                                                    padding: '0.125rem 0',
-                                                    width: '100%',
-                                                    fontFamily: 'var(--font-jakarta), sans-serif',
-                                                }}
-                                            />
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                value={item.amount || ''}
-                                                onChange={(e) => updateLineItem(item.id, { amount: parseFloat(e.target.value) || 0 })}
-                                                className="font-mono"
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    borderBottom: '1px solid var(--border-2)',
-                                                    color: noParticipants ? 'var(--red)' : 'var(--dim)',
-                                                    fontSize: '0.8125rem',
-                                                    outline: 'none',
-                                                    padding: '0.125rem 0',
-                                                    width: '60px',
-                                                    textAlign: 'right',
-                                                    marginTop: '0.25rem',
-                                                }}
-                                            />
-                                        </div>
-
+                                        {/* Name — grows */}
+                                        <input
+                                            type="text"
+                                            value={item.name}
+                                            onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
+                                            style={{
+                                                flex: 1,
+                                                minWidth: 0,
+                                                background: 'none',
+                                                border: 'none',
+                                                borderBottom: `1px solid ${accent ?? 'var(--border-2)'}`,
+                                                color: accent ?? 'var(--body)',
+                                                fontSize: '0.875rem',
+                                                outline: 'none',
+                                                padding: '0.25rem 0',
+                                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                            }}
+                                        />
+                                        {/* Amount — fixed width, no spinners */}
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={item.amount || ''}
+                                            onChange={(e) => updateLineItem(item.id, { amount: parseFloat(e.target.value) || 0 })}
+                                            className="font-mono no-spinner"
+                                            style={{
+                                                width: '64px',
+                                                flexShrink: 0,
+                                                background: 'none',
+                                                border: 'none',
+                                                borderBottom: `1px solid ${accent ?? 'var(--border-2)'}`,
+                                                color: accent ?? 'var(--dim)',
+                                                fontSize: '0.8125rem',
+                                                outline: 'none',
+                                                padding: '0.25rem 0',
+                                                textAlign: 'right',
+                                            }}
+                                        />
                                         {/* Participant avatars */}
                                         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                                             {users.map((user) => {
@@ -491,6 +485,7 @@ export default function CreateExpense() {
                                     </div>
                                 )
                             })}
+                            </div>
 
                             {/* Note if any item has no participants */}
                             {!allItemsHaveParticipants && (

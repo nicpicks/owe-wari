@@ -213,6 +213,11 @@ body::after {
   font-family: var(--font-mono), monospace;
 }
 
+/* ─── No Spinner (number inputs) ───────────────────────────────── */
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.no-spinner { -moz-appearance: textfield; }
+
 /* ─── Animations ────────────────────────────────────────────────── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }

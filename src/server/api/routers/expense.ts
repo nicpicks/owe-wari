@@ -121,6 +121,46 @@ export const expenseRouter = createTRPCRouter({
             }
         }),
 
+    getExpense: publicProcedure
+        .input(z.object({ expenseId: z.number() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const [expense] = await ctx.db
+                    .select({
+                        id: expenses.id,
+                        title: expenses.title,
+                        amount: expenses.amount,
+                        category: expenses.category,
+                        notes: expenses.notes,
+                        expenseDate: expenses.expenseDate,
+                        paidByUserId: expenses.paidByUserId,
+                        paidByName: users.name,
+                    })
+                    .from(expenses)
+                    .innerJoin(users, eq(users.id, expenses.paidByUserId))
+                    .where(eq(expenses.id, input.expenseId))
+                    .execute()
+
+                if (!expense) throw new Error('Expense not found')
+
+                const splits = await ctx.db
+                    .select({
+                        userId: expenseSplits.userId,
+                        name: users.name,
+                        amount: expenseSplits.amount,
+                    })
+                    .from(expenseSplits)
+                    .innerJoin(users, eq(users.id, expenseSplits.userId))
+                    .where(eq(expenseSplits.expenseId, input.expenseId))
+                    .execute()
+
+                return { ...expense, splits }
+            } catch (error) {
+                console.error('Error getting expense:', error)
+                throw new Error('Failed to get expense')
+            }
+        }),
+
     getTotalExpenseCost: publicProcedure
         .input(z.object({ groupId: z.string() }))
         .query(async ({ ctx, input }) => {
