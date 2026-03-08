@@ -123,4 +123,18 @@ export const groupRouter = createTRPCRouter({
                 throw new Error('Failed to update default payee')
             }
         }),
+
+    addMember: publicProcedure
+        .input(z.object({ groupId: z.string(), name: z.string().min(1) }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                const userId = ulid()
+                await ctx.db.insert(users).values({ id: userId, name: input.name })
+                await ctx.db.insert(groupMembers).values({ groupId: input.groupId, userId })
+                return { id: userId, name: input.name }
+            } catch (error) {
+                console.error('Error adding member:', error)
+                throw new Error('Failed to add member')
+            }
+        }),
 })
