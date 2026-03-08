@@ -91,6 +91,8 @@ export default function CreateExpense() {
     const [splitMode, setSplitMode] = useState<SplitMode>('even')
     const [manualAmounts, setManualAmounts] = useState<Record<string, number>>({})
     const [lineItems, setLineItems] = useState<LineItem[]>([])
+    const [scannedLineItems, setScannedLineItems] = useState<LineItem[]>([])
+    const [lineItemMemberIds, setLineItemMemberIds] = useState<string[]>([])
 
     const { data: defaultPayee } = api.group.getDefaultPayee.useQuery(
         { groupId: groupId ?? '' },
@@ -110,6 +112,7 @@ export default function CreateExpense() {
             usersData.forEach((u) => { init[u.id] = true; initAmounts[u.id] = 0 })
             setIsChecked(init)
             setManualAmounts(initAmounts)
+            setLineItemMemberIds(usersData.map((u) => u.id))
             if (defaultPayee) setPaidByUserId(defaultPayee)
         }
         if (usersError) console.error('Error fetching users:', usersError)
@@ -125,15 +128,14 @@ export default function CreateExpense() {
                 alert('Could not detect a total on this receipt. Please enter the amount manually.')
             }
             if (data.items.length > 0) {
-                const allIds = users.map((u) => u.id)
-                setLineItems(
-                    data.items.map((item, i) => ({
-                        id: String(i),
-                        name: item.name,
-                        amount: item.amount,
-                        participantIds: allIds,
-                    }))
-                )
+                const scanned = data.items.map((item, i) => ({
+                    id: String(i),
+                    name: item.name,
+                    amount: item.amount,
+                    participantIds: [] as string[],
+                }))
+                setScannedLineItems(scanned)
+                setLineItems(scanned)
             }
         },
         onError: () => {
@@ -167,6 +169,32 @@ export default function CreateExpense() {
         setLineItems((prev) =>
             prev.map((item) => item.id !== id ? item : { ...item, ...patch })
         )
+    }
+
+    const removeLineItem = (id: string) => {
+        setLineItems((prev) => prev.filter((item) => item.id !== id))
+    }
+
+    const addLineItem = () => {
+        setLineItems((prev) => [
+            ...prev,
+            { id: Date.now().toString(), name: '', amount: 0, participantIds: [] },
+        ])
+    }
+
+    const toggleLineItemMember = (userId: string) => {
+        const isRemoving = lineItemMemberIds.includes(userId)
+        setLineItemMemberIds((prev) =>
+            isRemoving ? prev.filter((id) => id !== userId) : [...prev, userId]
+        )
+        if (isRemoving) {
+            setLineItems((prev) =>
+                prev.map((item) => ({
+                    ...item,
+                    participantIds: item.participantIds.filter((id) => id !== userId),
+                }))
+            )
+        }
     }
 
     const toggleLineItemParticipant = (itemId: string, userId: string) => {
@@ -387,7 +415,7 @@ export default function CreateExpense() {
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => setLineItems([])}
+                                    onClick={() => setLineItems(scannedLineItems.map((item) => ({ ...item, participantIds: [] })))}
                                     style={{
                                         background: 'none', border: '1px solid var(--border-2)',
                                         borderRadius: '6px', padding: '0.3125rem 0.625rem',
@@ -398,6 +426,42 @@ export default function CreateExpense() {
                                 >
                                     Clear
                                 </button>
+                            </div>
+
+                            {/* Who's here */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+                                <span style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>Who&apos;s here:</span>
+                                {users.map((user) => {
+                                    const included = lineItemMemberIds.includes(user.id)
+                                    const initials = getInitials(user.name, allNames)
+                                    return (
+                                        <button
+                                            key={user.id}
+                                            type="button"
+                                            onClick={() => toggleLineItemMember(user.id)}
+                                            title={user.name}
+                                            style={{
+                                                width: '28px',
+                                                height: '28px',
+                                                borderRadius: '50%',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                                fontSize: initials.length > 1 ? '0.5625rem' : '0.625rem',
+                                                fontWeight: 600,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                                transition: 'background 0.15s, color 0.15s',
+                                                background: included ? 'var(--amber)' : 'var(--surface-3)',
+                                                color: included ? '#0B0B0B' : 'var(--muted)',
+                                            }}
+                                        >
+                                            {initials}
+                                        </button>
+                                    )
+                                })}
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -450,7 +514,7 @@ export default function CreateExpense() {
                                         />
                                         {/* Participant avatars */}
                                         <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-                                            {users.map((user) => {
+                                            {users.filter((user) => lineItemMemberIds.includes(user.id)).map((user) => {
                                                 const selected = item.participantIds.includes(user.id)
                                                 const initials = getInitials(user.name, allNames)
                                                 return (
@@ -482,10 +546,40 @@ export default function CreateExpense() {
                                                 )
                                             })}
                                         </div>
+                                        {/* Delete row */}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeLineItem(item.id)}
+                                            style={{
+                                                background: 'none', border: 'none',
+                                                color: 'var(--muted)', cursor: 'pointer',
+                                                padding: '0 0.125rem', flexShrink: 0,
+                                                fontSize: '1rem', lineHeight: 1,
+                                                display: 'flex', alignItems: 'center',
+                                            }}
+                                            title="Remove item"
+                                        >
+                                            ×
+                                        </button>
                                     </div>
                                 )
                             })}
                             </div>
+
+                            {/* Add item */}
+                            <button
+                                type="button"
+                                onClick={addLineItem}
+                                style={{
+                                    marginTop: '0.5rem',
+                                    background: 'none', border: 'none',
+                                    color: 'var(--dim)', cursor: 'pointer',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-jakarta), sans-serif',
+                                    padding: '0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.25rem',
+                                }}
+                            >
+                                <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span> Add item
+                            </button>
 
                             {/* Note if any item has no participants */}
                             {!allItemsHaveParticipants && (
