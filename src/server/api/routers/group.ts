@@ -65,6 +65,23 @@ export const groupRouter = createTRPCRouter({
             }
         }),
 
+    getGroup: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const result = await ctx.db
+                    .select({ id: groups.id, name: groups.name, currency: groups.currency })
+                    .from(groups)
+                    .where(eq(groups.id, input.groupId))
+                    .execute()
+
+                return result[0] ?? null
+            } catch (error) {
+                console.error('Error fetching group:', error)
+                throw new Error('Failed to fetch group')
+            }
+        }),
+
     getUsers: publicProcedure
         .input(z.object({ groupId: z.string() }))
         .query(async ({ ctx, input }) => {
