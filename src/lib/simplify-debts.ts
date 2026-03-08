@@ -20,10 +20,11 @@ export function simplifyDebts(balances: Balance[]): Transfer[] {
     const debtors: Array<{ userId: string; name: string; amount: number }> = []
 
     for (const { userId, name, netBalance } of balances) {
-        if (netBalance > 0.005) {
-            creditors.push({ userId, name, amount: netBalance })
-        } else if (netBalance < -0.005) {
-            debtors.push({ userId, name, amount: -netBalance })
+        const rounded = Math.round(netBalance * 100) / 100
+        if (rounded > 0) {
+            creditors.push({ userId, name, amount: rounded })
+        } else if (rounded < 0) {
+            debtors.push({ userId, name, amount: -rounded })
         }
     }
 
@@ -37,21 +38,21 @@ export function simplifyDebts(balances: Balance[]): Transfer[] {
     while (ci < creditors.length && di < debtors.length) {
         const creditor = creditors[ci]!
         const debtor = debtors[di]!
-        const amount = Math.min(creditor.amount, debtor.amount)
+        const amount = Math.round(Math.min(creditor.amount, debtor.amount) * 100) / 100
 
         transfers.push({
             from: debtor.userId,
             fromName: debtor.name,
             to: creditor.userId,
             toName: creditor.name,
-            amount: Math.round(amount * 100) / 100,
+            amount,
         })
 
-        creditor.amount -= amount
-        debtor.amount -= amount
+        creditor.amount = Math.round((creditor.amount - amount) * 100) / 100
+        debtor.amount = Math.round((debtor.amount - amount) * 100) / 100
 
-        if (creditor.amount < 0.005) ci++
-        if (debtor.amount < 0.005) di++
+        if (creditor.amount <= 0) ci++
+        if (debtor.amount <= 0) di++
     }
 
     return transfers
