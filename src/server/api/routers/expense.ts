@@ -249,7 +249,7 @@ export const expenseRouter = createTRPCRouter({
                     const owed = owedMap.get(userId) ?? 0
                     const received = receivedMap.get(userId) ?? 0
                     const settled = settledMap.get(userId) ?? 0
-                    const netBalance = paid - owed + received - settled
+                    const netBalance = paid - owed - received + settled
                     return { userId, name, netBalance }
                 })
             } catch (error) {
