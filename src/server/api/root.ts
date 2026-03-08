@@ -1,6 +1,7 @@
 import { createCallerFactory, createTRPCRouter } from '~/server/api/trpc'
 import { groupRouter } from './routers/group'
 import { expenseRouter } from './routers/expense'
+import { receiptRouter } from './routers/receipt'
 
 /**
  * This is the primary router for your server.
@@ -10,6 +11,7 @@ import { expenseRouter } from './routers/expense'
 export const appRouter = createTRPCRouter({
     group: groupRouter,
     expense: expenseRouter,
+    receipt: receiptRouter,
 })
 
 // export type definition of API

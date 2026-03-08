@@ -8,6 +8,7 @@ export const env = createEnv({
      */
     server: {
         POSTGRES_URL: z.string().url(),
+        ANTHROPIC_API_KEY: z.string().min(1),
         NODE_ENV: z
             .enum(['development', 'test', 'production'])
             .default('development'),
@@ -28,6 +29,7 @@ export const env = createEnv({
      */
     runtimeEnv: {
         POSTGRES_URL: process.env.POSTGRES_URL,
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
         NODE_ENV: process.env.NODE_ENV,
         // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
     },
