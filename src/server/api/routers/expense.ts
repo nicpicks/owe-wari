@@ -7,6 +7,7 @@ import {
     expenseSplits,
     groupMembers,
     groupCurrencies,
+    groups,
     settlements,
     users,
 } from '~/server/db/schema'
@@ -184,13 +185,43 @@ export const expenseRouter = createTRPCRouter({
         .input(z.object({ groupId: z.string() }))
         .query(async ({ ctx, input }) => {
             try {
-                const totalExpenseCost = await ctx.db
-                    .select({ total: sql<number>`SUM(${expenses.amount})` })
-                    .from(expenses)
-                    .where(eq(expenses.groupId, input.groupId))
+                const [group] = await ctx.db
+                    .select({ defaultCode: groups.currency })
+                    .from(groups)
+                    .where(eq(groups.id, input.groupId))
                     .execute()
 
-                return totalExpenseCost[0]?.total ?? 0
+                if (!group) {
+                    return { defaultTotal: 0, defaultCurrency: 'SGD', otherCurrencyCount: 0 }
+                }
+
+                const [defaultRow] = await ctx.db
+                    .select({ total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)` })
+                    .from(expenses)
+                    .where(
+                        and(
+                            eq(expenses.groupId, input.groupId),
+                            eq(expenses.currency, group.defaultCode)
+                        )
+                    )
+                    .execute()
+
+                const [otherRow] = await ctx.db
+                    .select({ count: sql<string>`COUNT(*)` })
+                    .from(expenses)
+                    .where(
+                        and(
+                            eq(expenses.groupId, input.groupId),
+                            sql`${expenses.currency} <> ${group.defaultCode}`
+                        )
+                    )
+                    .execute()
+
+                return {
+                    defaultTotal: parseFloat(defaultRow?.total ?? '0'),
+                    defaultCurrency: group.defaultCode,
+                    otherCurrencyCount: parseInt(otherRow?.count ?? '0', 10),
+                }
             } catch (error) {
                 console.error('Error getting total expense cost:', error)
                 throw new Error('Failed to get total expense cost')
