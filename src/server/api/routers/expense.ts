@@ -234,7 +234,6 @@ export const expenseRouter = createTRPCRouter({
             try {
                 const { groupId } = input
 
-                // Get all members in the group
                 const members = await ctx.db
                     .select({ userId: users.id, name: users.name })
                     .from(users)
@@ -244,64 +243,89 @@ export const expenseRouter = createTRPCRouter({
 
                 if (members.length === 0) return []
 
-                // SUM paid by each user
                 const paidRows = await ctx.db
                     .select({
                         userId: expenses.paidByUserId,
+                        currency: expenses.currency,
                         total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
                     })
                     .from(expenses)
                     .where(eq(expenses.groupId, groupId))
-                    .groupBy(expenses.paidByUserId)
+                    .groupBy(expenses.paidByUserId, expenses.currency)
                     .execute()
 
-                // SUM owed by each user (via expense_splits)
                 const owedRows = await ctx.db
                     .select({
                         userId: expenseSplits.userId,
+                        currency: expenses.currency,
                         total: sql<string>`COALESCE(SUM(${expenseSplits.amount}), 0)`,
                     })
                     .from(expenseSplits)
                     .innerJoin(expenses, eq(expenseSplits.expenseId, expenses.id))
                     .where(eq(expenses.groupId, groupId))
-                    .groupBy(expenseSplits.userId)
+                    .groupBy(expenseSplits.userId, expenses.currency)
                     .execute()
 
-                // SUM received in settlements (receiverId)
                 const receivedRows = await ctx.db
                     .select({
                         userId: settlements.receiverId,
+                        currency: settlements.currency,
                         total: sql<string>`COALESCE(SUM(${settlements.amount}), 0)`,
                     })
                     .from(settlements)
                     .where(eq(settlements.groupId, groupId))
-                    .groupBy(settlements.receiverId)
+                    .groupBy(settlements.receiverId, settlements.currency)
                     .execute()
 
-                // SUM paid in settlements (payerId)
                 const settledRows = await ctx.db
                     .select({
                         userId: settlements.payerId,
+                        currency: settlements.currency,
                         total: sql<string>`COALESCE(SUM(${settlements.amount}), 0)`,
                     })
                     .from(settlements)
                     .where(eq(settlements.groupId, groupId))
-                    .groupBy(settlements.payerId)
+                    .groupBy(settlements.payerId, settlements.currency)
                     .execute()
 
-                const paidMap = new Map(paidRows.map((r) => [r.userId, parseFloat(r.total)]))
-                const owedMap = new Map(owedRows.map((r) => [r.userId, parseFloat(r.total)]))
-                const receivedMap = new Map(receivedRows.map((r) => [r.userId, parseFloat(r.total)]))
-                const settledMap = new Map(settledRows.map((r) => [r.userId, parseFloat(r.total)]))
+                // (userId, currency) -> partial sums
+                type Key = string
+                const k = (userId: string, currency: string): Key => `${userId}|${currency}`
+                const acc = new Map<Key, {
+                    userId: string
+                    currency: string
+                    paid: number
+                    owed: number
+                    received: number
+                    settled: number
+                }>()
+                const ensure = (userId: string, currency: string) => {
+                    const key = k(userId, currency)
+                    let row = acc.get(key)
+                    if (!row) {
+                        row = { userId, currency, paid: 0, owed: 0, received: 0, settled: 0 }
+                        acc.set(key, row)
+                    }
+                    return row
+                }
 
-                return members.map(({ userId, name }) => {
-                    const paid = paidMap.get(userId) ?? 0
-                    const owed = owedMap.get(userId) ?? 0
-                    const received = receivedMap.get(userId) ?? 0
-                    const settled = settledMap.get(userId) ?? 0
-                    const netBalance = paid - owed - received + settled
-                    return { userId, name, netBalance }
-                })
+                for (const r of paidRows) ensure(r.userId, r.currency).paid = parseFloat(r.total)
+                for (const r of owedRows) ensure(r.userId, r.currency).owed = parseFloat(r.total)
+                for (const r of receivedRows) ensure(r.userId, r.currency).received = parseFloat(r.total)
+                for (const r of settledRows) ensure(r.userId, r.currency).settled = parseFloat(r.total)
+
+                const memberMap = new Map(members.map((m) => [m.userId, m.name]))
+
+                const out: { userId: string; name: string; currency: string; netBalance: number }[] = []
+                for (const row of acc.values()) {
+                    const name = memberMap.get(row.userId)
+                    if (!name) continue // user not in group anymore (defensive)
+                    const netBalance = row.paid - row.owed - row.received + row.settled
+                    if (Math.abs(netBalance) < 0.005) continue
+                    out.push({ userId: row.userId, name, currency: row.currency, netBalance })
+                }
+
+                return out
             } catch (error) {
                 console.error('Error getting balances:', error)
                 throw new Error('Failed to get balances')
