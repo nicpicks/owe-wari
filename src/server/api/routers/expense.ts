@@ -338,21 +338,44 @@ export const expenseRouter = createTRPCRouter({
                 groupId: z.string(),
                 payerId: z.string(),
                 receiverId: z.string(),
-                amount: z.number(),
+                lines: z
+                    .array(
+                        z.object({
+                            currency: z.string().min(1),
+                            amount: z.number().positive(),
+                        })
+                    )
+                    .min(1),
             })
         )
         .mutation(async ({ ctx, input }) => {
             try {
-                await ctx.db
-                    .insert(settlements)
-                    .values({
-                        groupId: input.groupId,
-                        payerId: input.payerId,
-                        receiverId: input.receiverId,
-                        amount: input.amount.toString(),
-                    })
-                    .execute()
+                await ctx.db.transaction(async (trx) => {
+                    const allowed = await trx
+                        .select({ code: groupCurrencies.code })
+                        .from(groupCurrencies)
+                        .where(eq(groupCurrencies.groupId, input.groupId))
+                        .execute()
+                    const allowedSet = new Set(allowed.map((r) => r.code))
+                    for (const line of input.lines) {
+                        if (!allowedSet.has(line.currency)) {
+                            throw new Error(`Currency ${line.currency} is not enabled for this group`)
+                        }
+                    }
 
+                    await trx
+                        .insert(settlements)
+                        .values(
+                            input.lines.map((line) => ({
+                                groupId: input.groupId,
+                                payerId: input.payerId,
+                                receiverId: input.receiverId,
+                                amount: line.amount.toString(),
+                                currency: line.currency,
+                            }))
+                        )
+                        .execute()
+                })
                 return { success: true }
             } catch (error) {
                 console.error('Error settling up:', error)
