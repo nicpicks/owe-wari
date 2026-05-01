@@ -104,6 +104,18 @@ export default function CreateExpense() {
         { enabled: !!groupId }
     )
 
+    const { data: groupCurrenciesData } = api.group.getCurrencies.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId }
+    )
+    const [currency, setCurrency] = useState<string>('SGD')
+
+    useEffect(() => {
+        if (!groupCurrenciesData) return
+        const def = groupCurrenciesData.find((c) => c.isDefault)?.code
+        if (def) setCurrency(def)
+    }, [groupCurrenciesData])
+
     useEffect(() => {
         if (usersData) {
             setUsers(usersData)
@@ -240,13 +252,13 @@ export default function CreateExpense() {
                 .map(([userId, amt]) => ({ userId, amount: amt }))
             createExpense.mutate({
                 title, groupId: groupId ?? '', paidByUserId,
-                amount, category, notes, expenseDate, splitAmounts,
+                amount, currency, category, notes, expenseDate, splitAmounts,
             })
         } else {
             const payload = activeModeConfig.toPayload(splitCtx)
             createExpense.mutate({
                 title, groupId: groupId ?? '', paidByUserId,
-                amount, category, notes, expenseDate, ...payload,
+                amount, currency, category, notes, expenseDate, ...payload,
             })
         }
     }
@@ -342,19 +354,33 @@ export default function CreateExpense() {
                                 />
                             </div>
 
-                            <div className="field-group">
-                                <label className="field-label">Amount</label>
-                                <input
-                                    className="field-input"
-                                    type="number"
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                    value={amount || ''}
-                                    onChange={(e) => setAmount(Number(e.target.value))}
-                                    required
-                                    style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '1.0625rem' }}
-                                />
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <div className="field-group" style={{ flex: 1 }}>
+                                    <label className="field-label">Amount</label>
+                                    <input
+                                        className="field-input"
+                                        type="number"
+                                        placeholder="0.00"
+                                        step="0.01"
+                                        min="0"
+                                        value={amount || ''}
+                                        onChange={(e) => setAmount(Number(e.target.value))}
+                                        required
+                                        style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '1.0625rem' }}
+                                    />
+                                </div>
+                                <div className="field-group" style={{ width: '90px' }}>
+                                    <label className="field-label">Currency</label>
+                                    <select
+                                        className="field-select"
+                                        value={currency}
+                                        onChange={(e) => setCurrency(e.target.value)}
+                                    >
+                                        {(groupCurrenciesData ?? []).map(({ code }) => (
+                                            <option key={code} value={code}>{code}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="field-group">
