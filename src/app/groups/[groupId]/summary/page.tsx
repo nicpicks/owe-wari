@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import Tabs from '~/app/_components/tabs'
 import { api } from '~/trpc/react'
+import { formatAmount } from '~/lib/format-currency'
 
 const SummaryTab = () => {
     const router = useRouter()
@@ -13,7 +14,7 @@ const SummaryTab = () => {
         router.push(`/groups/${groupId}/${tab}`)
     }
 
-    const { data: totalExpenses } = api.expense.getTotalExpenseCost.useQuery(
+    const { data: totals } = api.expense.getTotalExpenseCost.useQuery(
         { groupId },
         { enabled: !!groupId }
     )
@@ -23,9 +24,39 @@ const SummaryTab = () => {
         { enabled: !!groupId }
     )
 
-    const totalOwed = balances
-        ? balances.filter((b) => b.netBalance < -0.005).reduce((s, b) => s + Math.abs(b.netBalance), 0)
+    const { data: usersData } = api.group.getUsers.useQuery(
+        { groupId },
+        { enabled: !!groupId }
+    )
+
+    const defaultCurrency = totals?.defaultCurrency ?? 'SGD'
+
+    const totalOwedDefault = balances
+        ? balances
+              .filter((b) => b.currency === defaultCurrency && b.netBalance < -0.005)
+              .reduce((s, b) => s + Math.abs(b.netBalance), 0)
         : null
+
+    const otherCurrenciesOutstanding = balances
+        ? new Set(
+              balances
+                  .filter((b) => b.currency !== defaultCurrency && b.netBalance < -0.005)
+                  .map((b) => b.currency)
+          ).size
+        : 0
+
+    const balancesByUser = new Map<
+        string,
+        { name: string; rows: { currency: string; netBalance: number }[] }
+    >()
+    for (const b of balances ?? []) {
+        let entry = balancesByUser.get(b.userId)
+        if (!entry) {
+            entry = { name: b.name, rows: [] }
+            balancesByUser.set(b.userId, entry)
+        }
+        entry.rows.push({ currency: b.currency, netBalance: b.netBalance })
+    }
 
     return (
         <div className="page-shell">
@@ -49,10 +80,16 @@ const SummaryTab = () => {
                                 lineHeight: 1,
                             }}
                         >
-                            {totalExpenses != null
-                                ? `$${Number(totalExpenses).toFixed(2)}`
+                            {totals
+                                ? formatAmount(totals.defaultTotal, totals.defaultCurrency)
                                 : '—'}
                         </div>
+                        {totals && totals.otherCurrencyCount > 0 && (
+                            <div style={{ marginTop: '0.375rem', fontSize: '0.6875rem', color: 'var(--muted)' }}>
+                                + {totals.otherCurrencyCount} expense
+                                {totals.otherCurrencyCount !== 1 ? 's' : ''} in other currencies
+                            </div>
+                        )}
                     </div>
                     <div className="card-dark" style={{ padding: '1.25rem' }}>
                         <div className="section-sub" style={{ marginBottom: '0.5rem' }}>Outstanding</div>
@@ -61,13 +98,21 @@ const SummaryTab = () => {
                                 fontFamily: 'var(--font-cormorant), serif',
                                 fontSize: '2rem',
                                 fontWeight: 600,
-                                color: totalOwed && totalOwed > 0 ? 'var(--red)' : 'var(--heading)',
+                                color: totalOwedDefault && totalOwedDefault > 0 ? 'var(--red)' : 'var(--heading)',
                                 letterSpacing: '-0.02em',
                                 lineHeight: 1,
                             }}
                         >
-                            {totalOwed != null ? `$${totalOwed.toFixed(2)}` : '—'}
+                            {totalOwedDefault != null
+                                ? formatAmount(totalOwedDefault, defaultCurrency)
+                                : '—'}
                         </div>
+                        {otherCurrenciesOutstanding > 0 && (
+                            <div style={{ marginTop: '0.375rem', fontSize: '0.6875rem', color: 'var(--muted)' }}>
+                                + {otherCurrenciesOutstanding} other currenc
+                                {otherCurrenciesOutstanding !== 1 ? 'ies' : 'y'} outstanding
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -84,45 +129,55 @@ const SummaryTab = () => {
                         </p>
                     )}
 
-                    {balances?.map(({ userId, name, netBalance }, i) => (
-                        <div
-                            key={userId}
-                            className={`ledger-row anim-fade-up d-${Math.min(i + 2, 8)}`}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                                <div
-                                    style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '50%',
-                                        background: 'var(--surface-3)',
-                                        border: '1px solid var(--border-2)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.6875rem',
-                                        fontWeight: 700,
-                                        color: 'var(--dim)',
-                                        flexShrink: 0,
-                                        textTransform: 'uppercase',
-                                    }}
-                                >
-                                    {name.charAt(0)}
-                                </div>
-                                <span style={{ color: 'var(--body)', fontSize: '0.9375rem' }}>{name}</span>
-                            </div>
-                            <span
-                                className={`font-mono ${netBalance > 0.005 ? 'amount-pos' : netBalance < -0.005 ? 'amount-neg' : 'amount-neu'}`}
-                                style={{ fontSize: '0.9375rem' }}
+                    {usersData?.map((u, i) => {
+                        const entry = balancesByUser.get(u.id)
+                        const rows = entry?.rows.filter((r) => Math.abs(r.netBalance) > 0.005) ?? []
+                        return (
+                            <div
+                                key={u.id}
+                                className={`ledger-row anim-fade-up d-${Math.min(i + 2, 8)}`}
                             >
-                                {netBalance > 0.005
-                                    ? `+$${netBalance.toFixed(2)}`
-                                    : netBalance < -0.005
-                                    ? `–$${Math.abs(netBalance).toFixed(2)}`
-                                    : 'settled'}
-                            </span>
-                        </div>
-                    ))}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                    <div
+                                        style={{
+                                            width: '28px',
+                                            height: '28px',
+                                            borderRadius: '50%',
+                                            background: 'var(--surface-3)',
+                                            border: '1px solid var(--border-2)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '0.6875rem',
+                                            fontWeight: 700,
+                                            color: 'var(--dim)',
+                                            flexShrink: 0,
+                                            textTransform: 'uppercase',
+                                        }}
+                                    >
+                                        {u.name.charAt(0)}
+                                    </div>
+                                    <span style={{ color: 'var(--body)', fontSize: '0.9375rem' }}>{u.name}</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.125rem' }}>
+                                    {rows.length === 0 ? (
+                                        <span className="font-mono amount-neu" style={{ fontSize: '0.9375rem' }}>settled</span>
+                                    ) : (
+                                        rows.map(({ currency, netBalance }) => (
+                                            <span
+                                                key={currency}
+                                                className={`font-mono ${netBalance > 0 ? 'amount-pos' : 'amount-neg'}`}
+                                                style={{ fontSize: '0.9375rem' }}
+                                            >
+                                                {netBalance > 0 ? '+' : '–'}
+                                                {formatAmount(Math.abs(netBalance), currency)}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
         </div>
