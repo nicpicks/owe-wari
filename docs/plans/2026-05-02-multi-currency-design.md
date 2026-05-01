@@ -199,3 +199,11 @@ export const ZERO_DECIMAL_CURRENCIES = new Set(['JPY','KRW','VND','IDR'])
 6. Open the summary page. Confirm "Total spent" shows the default-currency total plus the "+ N expenses in other currencies" hint when applicable.
 7. Create a pre-migration group manually (or simulate by setting expenses.currency to NULL on a row) — backfill must populate it from the group's default.
 8. `npm run lint` clean for changed files.
+9. Run `npm run screenshot` and update the affected screenshots in the repo:
+   - `03-create-group.png` — currency multi-select grid
+   - `04-group-summary.png` — totals + "other currencies" hint
+   - `05-group-expenses.png` — per-row currency labels
+   - `06-group-balances.png` — per-currency sections
+   - `07-group-history.png` — settlement currency labels
+   - `09-create-expense.png` — currency dropdown
+   Commit the regenerated images alongside the implementation.
