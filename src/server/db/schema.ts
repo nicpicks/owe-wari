@@ -57,6 +57,20 @@ export const groupMembers = createTable('group_members', {
     ),
 })
 
+export const groupCurrencies = createTable('group_currencies', {
+    id: serial('id').primaryKey().notNull(),
+    groupId: varchar('group_id', { length: 26 })
+        .references(() => groups.id)
+        .notNull(),
+    code: varchar('code', { length: 3 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+        .default(sql`CURRENT_TIMESTAMP`)
+        .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).default(
+        sql`CURRENT_TIMESTAMP`
+    ),
+})
+
 export const expenses = createTable('expenses', {
     id: serial('id').primaryKey().notNull(),
     groupId: varchar('group_id', { length: 26 })
@@ -67,6 +81,7 @@ export const expenses = createTable('expenses', {
         .notNull(),
     title: varchar('title', { length: 256 }).notNull(),
     amount: numeric('amount').notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('SGD'),
     category: varchar('category', { length: 256 }),
     notes: varchar('notes', { length: 256 }),
     expenseDate: timestamp('expense_date', { withTimezone: true })
@@ -109,6 +124,7 @@ export const settlements = createTable('settlements', {
         .references(() => users.id)
         .notNull(),
     amount: numeric('amount').notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('SGD'),
     settledAt: timestamp('settled_at', { withTimezone: true })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),
@@ -123,4 +139,5 @@ export const indexes = [
     index('idx_expenses_paid_by_user_id').on(expenses.paidByUserId),
     index('idx_expense_splits_expense_id').on(expenseSplits.expenseId),
     index('idx_expense_splits_user_id').on(expenseSplits.userId),
+    index('idx_group_currencies_group_id').on(groupCurrencies.groupId),
 ]
