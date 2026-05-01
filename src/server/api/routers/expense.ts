@@ -1,11 +1,12 @@
 import { z } from 'zod'
-import { eq, sql } from 'drizzle-orm'
+import { eq, sql, and } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import {
     expenses,
     expenseSplits,
     groupMembers,
+    groupCurrencies,
     settlements,
     users,
 } from '~/server/db/schema'
@@ -18,6 +19,7 @@ export const expenseRouter = createTRPCRouter({
                 paidByUserId: z.string(),
                 title: z.string().min(1),
                 amount: z.number(),
+                currency: z.string().min(1),
                 category: z.string().optional(),
                 notes: z.string().optional(),
                 expenseDate: z.date().optional(),
@@ -31,6 +33,20 @@ export const expenseRouter = createTRPCRouter({
         .mutation(async ({ ctx, input }) => {
             try {
                 await ctx.db.transaction(async (trx) => {
+                    const allowed = await trx
+                        .select({ code: groupCurrencies.code })
+                        .from(groupCurrencies)
+                        .where(
+                            and(
+                                eq(groupCurrencies.groupId, input.groupId),
+                                eq(groupCurrencies.code, input.currency)
+                            )
+                        )
+                        .execute()
+                    if (allowed.length === 0) {
+                        throw new Error(`Currency ${input.currency} is not enabled for this group`)
+                    }
+
                     const [newExpense] = await trx
                         .insert(expenses)
                         .values({
@@ -38,6 +54,7 @@ export const expenseRouter = createTRPCRouter({
                             paidByUserId: input.paidByUserId,
                             title: input.title,
                             amount: input.amount.toString(),
+                            currency: input.currency,
                             category: input.category,
                             notes: input.notes,
                             expenseDate: input.expenseDate,
