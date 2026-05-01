@@ -6,11 +6,13 @@ import Link from 'next/link'
 import Tabs from '~/app/_components/tabs'
 import { ExpenseDetailModal } from '~/app/_components/expense-detail-modal'
 import { api } from '~/trpc/react'
+import { formatAmount } from '~/lib/format-currency'
 
 interface Expense {
     id: number
     title: string
     amount: string
+    currency: string
     category: string | null
     notes: string | null
     expenseDate: Date
@@ -170,7 +172,7 @@ const ExpensesTab = () => {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        ${parseFloat(expense.amount).toFixed(2)}
+                                        {formatAmount(parseFloat(expense.amount), expense.currency)}
                                     </div>
                                 </div>
                             )

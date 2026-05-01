@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { api } from '~/trpc/react'
+import { formatAmount } from '~/lib/format-currency'
 
 const CATEGORY_COLORS: Record<string, string> = {
     Food: '#F59E0B',
@@ -10,10 +11,6 @@ const CATEGORY_COLORS: Record<string, string> = {
     Groceries: '#10B981',
     General: '#717181',
     Others: '#8B5CF6',
-}
-
-function formatAmount(amount: string) {
-    return `$${parseFloat(amount).toFixed(2)}`
 }
 
 function formatDate(date: Date) {
@@ -89,7 +86,7 @@ export function ExpenseDetailModal({ expenseId, onClose }: ExpenseDetailModalPro
                             <div className="flex items-center justify-between">
                                 <span style={{ color: 'var(--muted)' }} className="text-sm">Amount</span>
                                 <span className="font-mono text-lg font-semibold" style={{ color: 'var(--heading)' }}>
-                                    {formatAmount(expense.amount)}
+                                    {formatAmount(parseFloat(expense.amount), expense.currency)}
                                 </span>
                             </div>
 
@@ -148,7 +145,7 @@ export function ExpenseDetailModal({ expenseId, onClose }: ExpenseDetailModalPro
                                             {split.name}
                                         </span>
                                         <span className="font-mono text-sm" style={{ color: 'var(--muted)' }}>
-                                            {formatAmount(split.amount)}
+                                            {formatAmount(parseFloat(split.amount), expense.currency)}
                                         </span>
                                     </div>
                                 ))}
