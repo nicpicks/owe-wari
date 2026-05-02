@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { eq, sql, and } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import {
@@ -137,6 +138,59 @@ export const expenseRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error getting expenses:', error)
                 throw new Error('Failed to get expenses')
+            }
+        }),
+
+    getHistory: publicProcedure
+        .input(z.object({ groupId: z.string().min(1) }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const expenseRows = await ctx.db
+                    .select({
+                        id: expenses.id,
+                        title: expenses.title,
+                        amount: expenses.amount,
+                        currency: expenses.currency,
+                        actorId: expenses.paidByUserId,
+                        actorName: users.name,
+                        at: expenses.createdAt,
+                    })
+                    .from(expenses)
+                    .innerJoin(users, eq(users.id, expenses.paidByUserId))
+                    .where(eq(expenses.groupId, input.groupId))
+                    .execute()
+
+                const payerUsers = alias(users, 'payer_users')
+                const receiverUsers = alias(users, 'receiver_users')
+
+                const settlementRows = await ctx.db
+                    .select({
+                        id: settlements.id,
+                        amount: settlements.amount,
+                        currency: settlements.currency,
+                        actorId: settlements.payerId,
+                        actorName: payerUsers.name,
+                        receiverId: settlements.receiverId,
+                        receiverName: receiverUsers.name,
+                        at: settlements.settledAt,
+                    })
+                    .from(settlements)
+                    .innerJoin(payerUsers, eq(payerUsers.id, settlements.payerId))
+                    .innerJoin(receiverUsers, eq(receiverUsers.id, settlements.receiverId))
+                    .where(eq(settlements.groupId, input.groupId))
+                    .execute()
+
+                const events = [
+                    ...expenseRows.map((r) => ({ type: 'expense' as const, ...r })),
+                    ...settlementRows.map((r) => ({ type: 'settlement' as const, ...r })),
+                ]
+
+                events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+
+                return events
+            } catch (error) {
+                console.error('Error getting history:', error)
+                throw new Error('Failed to get history')
             }
         }),
 

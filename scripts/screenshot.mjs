@@ -149,6 +149,17 @@ async function seedTestGroup() {
         console.log(`   + Expense: ${exp.title} (${exp.currency} ${exp.amount})`)
     }
 
+    // Seed one settlement so the history page demos both event types.
+    if (userIds.length >= 2) {
+        await callTRPC('expense.settleUp', {
+            groupId,
+            payerId: userIds[1],
+            receiverId: userIds[0],
+            lines: [{ currency: 'SGD', amount: 12.5 }],
+        })
+        console.log(`   ↔ Settlement: ${users[1].name} → ${users[0].name} SGD 12.50`)
+    }
+
     return { groupId, users }
 }
 
