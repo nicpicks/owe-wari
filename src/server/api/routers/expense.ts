@@ -358,7 +358,7 @@ export const expenseRouter = createTRPCRouter({
                 return out
             } catch (error) {
                 console.error('Error getting balances:', error)
-                throw new Error('Failed to get balances')
+                throw new Error(error instanceof Error ? error.message : 'Failed to get balances')
             }
         }),
 
