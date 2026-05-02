@@ -240,7 +240,7 @@ export default function CreateExpense() {
         onSuccess: (data) => router.push(`/groups/${data.id}/expenses`),
         onError: (error) => {
             console.error('Error creating expense:', error)
-            alert('Failed to create expense')
+            alert(error.message || 'Failed to create expense')
         },
     })
 
