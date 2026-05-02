@@ -12,6 +12,7 @@ export const env = createEnv({
         NODE_ENV: z
             .enum(['development', 'test', 'production'])
             .default('development'),
+        MCP_API_TOKEN: z.string().min(32),
     },
 
     /**
@@ -31,6 +32,7 @@ export const env = createEnv({
         POSTGRES_URL: process.env.POSTGRES_URL,
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
         NODE_ENV: process.env.NODE_ENV,
+        MCP_API_TOKEN: process.env.MCP_API_TOKEN,
         // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
     },
     /**
