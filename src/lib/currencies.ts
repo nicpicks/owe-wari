@@ -1,5 +1,5 @@
 export const SUPPORTED_CURRENCIES = [
-    'SGD', 'USD', 'AUD', 'EUR', 'JPY', 'KRW', 'MYR', 'IDR', 'VND',
+    'SGD', 'USD', 'AUD', 'EUR', 'JPY', 'CNY', 'KRW', 'MYR', 'IDR', 'VND',
 ] as const
 
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number]
@@ -12,6 +12,7 @@ export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
     AUD: 'A$',
     EUR: '€',
     JPY: '¥',
+    CNY: '¥',
     KRW: '₩',
     MYR: 'RM',
     IDR: 'Rp',
