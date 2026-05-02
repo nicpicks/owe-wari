@@ -183,6 +183,7 @@ const ExpensesTab = () => {
 
             <ExpenseDetailModal
                 expenseId={selectedExpenseId}
+                groupId={groupId ?? ''}
                 onClose={() => setSelectedExpenseId(null)}
             />
         </div>
