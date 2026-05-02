@@ -694,17 +694,16 @@ export default function CreateExpense() {
                                     <div
                                         key={user.id}
                                         className="check-row"
-                                        onClick={() =>
-                                            setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
-                                        }
                                     >
                                         <input
                                             type="checkbox"
+                                            id={`split-${user.id}`}
                                             checked={!!isChecked[user.id]}
-                                            onChange={() => {}}
-                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={() =>
+                                                setIsChecked({ ...isChecked, [user.id]: !isChecked[user.id] })
+                                            }
                                         />
-                                        <label style={{ flex: 1 }}>{user.name}</label>
+                                        <label htmlFor={`split-${user.id}`} style={{ flex: 1 }}>{user.name}</label>
                                         {isChecked[user.id] && amount > 0 && checkedCount > 0 && (
                                             <span
                                                 className="font-mono"
