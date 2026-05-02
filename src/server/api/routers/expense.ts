@@ -181,6 +181,36 @@ export const expenseRouter = createTRPCRouter({
             }
         }),
 
+    update: publicProcedure
+        .input(
+            z.object({
+                expenseId: z.number(),
+                title: z.string().min(1).optional(),
+                category: z.string().optional(),
+                notes: z.string().optional(),
+                expenseDate: z.date().optional(),
+                paidByUserId: z.string().optional(),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const { expenseId, ...rest } = input
+            const patch = Object.fromEntries(
+                Object.entries(rest).filter(([, v]) => v !== undefined)
+            )
+            if (Object.keys(patch).length === 0) return { success: true }
+            try {
+                await ctx.db
+                    .update(expenses)
+                    .set(patch)
+                    .where(eq(expenses.id, expenseId))
+                    .execute()
+                return { success: true }
+            } catch (error) {
+                console.error('Error updating expense:', error)
+                throw new Error('Failed to update expense')
+            }
+        }),
+
     getTotalExpenseCost: publicProcedure
         .input(z.object({ groupId: z.string() }))
         .query(async ({ ctx, input }) => {
