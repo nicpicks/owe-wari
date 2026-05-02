@@ -1,4 +1,4 @@
-ALTER TABLE "owe-wari_groups" ADD COLUMN "default_payee" varchar(26) REFERENCES "owe-wari_users"("id");
+ALTER TABLE "owe-wari_groups" ADD COLUMN IF NOT EXISTS "default_payee" varchar(26) REFERENCES "owe-wari_users"("id");
 --> statement-breakpoint
 ALTER TABLE "owe-wari_expenses" ADD COLUMN IF NOT EXISTS "currency" varchar(3) NOT NULL DEFAULT 'SGD';
 --> statement-breakpoint
