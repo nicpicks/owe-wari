@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
-import { groups, users, groupMembers } from '~/server/db/schema'
+import { groups, users, groupMembers, groupCurrencies } from '~/server/db/schema'
 import { ulid } from 'ulid'
 
 export const groupRouter = createTRPCRouter({
@@ -11,6 +11,7 @@ export const groupRouter = createTRPCRouter({
             z.object({
                 name: z.string().min(1),
                 currency: z.string().min(1),
+                currencies: z.array(z.string().min(1)).min(1),
                 description: z.string(),
                 userNames: z.array(z.string().min(1)),
                 defaultPayee: z.string(),
@@ -18,6 +19,10 @@ export const groupRouter = createTRPCRouter({
         )
         .mutation(async ({ ctx, input }) => {
             try {
+                if (!input.currencies.includes(input.currency)) {
+                    throw new Error('Default currency must be in the currencies list')
+                }
+
                 const groupId = ulid()
                 const newGroup = await ctx.db
                     .insert(groups)
@@ -29,31 +34,22 @@ export const groupRouter = createTRPCRouter({
                     })
                     .returning({ id: groups.id })
 
-                let defaultPayeeId = ''
+                await ctx.db
+                    .insert(groupCurrencies)
+                    .values(input.currencies.map((code) => ({ groupId, code })))
 
+                let defaultPayeeId = ''
                 for (const userName of input.userNames) {
                     const userId = ulid()
-
-                    if (userName === input.defaultPayee) {
-                        defaultPayeeId = userId
-                    }
-
-                    await ctx.db.insert(users).values({
-                        id: userId,
-                        name: userName,
-                    })
-                    await ctx.db.insert(groupMembers).values({
-                        groupId,
-                        userId,
-                    })
+                    if (userName === input.defaultPayee) defaultPayeeId = userId
+                    await ctx.db.insert(users).values({ id: userId, name: userName })
+                    await ctx.db.insert(groupMembers).values({ groupId, userId })
                 }
 
                 if (defaultPayeeId) {
                     await ctx.db
                         .update(groups)
-                        .set({
-                            defaultPayee: defaultPayeeId,
-                        })
+                        .set({ defaultPayee: defaultPayeeId })
                         .where(eq(groups.id, groupId))
                         .execute()
                 }
@@ -79,6 +75,34 @@ export const groupRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error fetching group:', error)
                 throw new Error('Failed to fetch group')
+            }
+        }),
+
+    getCurrencies: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const [group] = await ctx.db
+                    .select({ defaultCode: groups.currency })
+                    .from(groups)
+                    .where(eq(groups.id, input.groupId))
+                    .execute()
+
+                if (!group) return []
+
+                const rows = await ctx.db
+                    .select({ code: groupCurrencies.code })
+                    .from(groupCurrencies)
+                    .where(eq(groupCurrencies.groupId, input.groupId))
+                    .execute()
+
+                return rows.map(({ code }) => ({
+                    code,
+                    isDefault: code === group.defaultCode,
+                }))
+            } catch (error) {
+                console.error('Error fetching currencies:', error)
+                throw new Error('Failed to fetch currencies')
             }
         }),
 

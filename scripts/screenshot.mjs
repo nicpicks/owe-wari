@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SCREENSHOTS_DIR = path.resolve(__dirname, '../screenshots')
-const BASE_URL = 'http://localhost:3000'
+const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000'
 const VIEWPORT = { width: 1280, height: 800 }
 
 fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true })
@@ -91,14 +91,15 @@ async function seedTestGroup() {
     const memberCount = Math.floor(Math.random() * 3) + 3   // 3–5 members
     const members = uniqueNames(memberCount)
     const defaultPayee = members[0]
-    const currencies = ['SGD', 'USD', 'AUD']
-    const currency = currencies[Math.floor(Math.random() * currencies.length)]
+    const currencies = ['SGD', 'JPY']
+    const currency = 'SGD'
 
-    console.log(`\n📦  Creating test group (${memberCount} members: ${members.join(', ')})\n`)
+    console.log(`\n📦  Creating test group (${memberCount} members: ${members.join(', ')}) with ${currencies.join(' + ')}\n`)
 
     const data = await callTRPC('group.create', {
-        name: `Test Trip ${Math.floor(Math.random() * 1000)}`,
+        name: `Tokyo Trip ${Math.floor(Math.random() * 1000)}`,
         currency,
+        currencies,
         description: 'Auto-generated for screenshot testing',
         userNames: members,
         defaultPayee,
@@ -114,19 +115,21 @@ async function seedTestGroup() {
     const users = usersData ?? []
     const userIds = users.map((u) => u.id)
 
-    // Add a few expenses with different payers and partial splits
+    // Mix of SGD and JPY expenses so balances/summary/history demo multi-currency
     const expenseDefs = [
-        { title: 'Airport taxi', amount: 48.0, payerIdx: 0, split: userIds },
+        { title: 'Airport taxi', amount: 48.0, currency: 'SGD', payerIdx: 0, split: userIds },
         {
             title: 'Hotel night 1',
-            amount: 180.0,
+            amount: 18000,
+            currency: 'JPY',
             payerIdx: 1,
             split: userIds.slice(0, Math.max(2, userIds.length - 1)),
         },
-        { title: 'Dinner', amount: 95.5, payerIdx: 0, split: userIds },
+        { title: 'Dinner at izakaya', amount: 9550, currency: 'JPY', payerIdx: 0, split: userIds },
         {
             title: 'Museum tickets',
             amount: 60.0,
+            currency: 'SGD',
             payerIdx: Math.min(2, userIds.length - 1),
             split: userIds.slice(1),
         },
@@ -139,10 +142,11 @@ async function seedTestGroup() {
             paidByUserId: userIds[payerIdx],
             title: exp.title,
             amount: exp.amount,
+            currency: exp.currency,
             category: 'General',
             splitUserIds: exp.split.filter((id) => !!id),
         })
-        console.log(`   + Expense: ${exp.title} ($${exp.amount})`)
+        console.log(`   + Expense: ${exp.title} (${exp.currency} ${exp.amount})`)
     }
 
     return { groupId, users }

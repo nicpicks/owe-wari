@@ -3,12 +3,13 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { api } from '~/trpc/react'
+import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY } from '~/lib/currencies'
 
 export default function CreateGroup() {
     const router = useRouter()
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
-    const [currency, setCurrency] = useState('SGD')
+    const [currencies, setCurrencies] = useState<string[]>([DEFAULT_CURRENCY])
     const [members, setMembers] = useState(['', ''])
     const [defaultPayee, setDefaultPayee] = useState('')
     const [createdGroupId, setCreatedGroupId] = useState<string | null>(null)
@@ -28,7 +29,14 @@ export default function CreateGroup() {
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
         const validMembers = members.filter((m) => m.trim().length > 0)
-        createGroup.mutate({ name, currency, description, userNames: validMembers, defaultPayee })
+        createGroup.mutate({
+            name,
+            currency: DEFAULT_CURRENCY,
+            currencies,
+            description,
+            userNames: validMembers,
+            defaultPayee,
+        })
     }
 
     const addMember = () => setMembers([...members, ''])
@@ -159,19 +167,57 @@ export default function CreateGroup() {
                                     required
                                 />
                             </div>
-                            <div className="field-group">
-                                <label className="field-label">Currency</label>
-                                <select
-                                    className="field-select"
-                                    value={currency}
-                                    onChange={(e) => setCurrency(e.target.value)}
+                            <div className="field-group" style={{ gridColumn: '1 / -1' }}>
+                                <label className="field-label">Currencies</label>
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(3, 1fr)',
+                                        gap: '0.5rem',
+                                    }}
                                 >
-                                    {['SGD', 'USD', 'AUD', 'EUR', 'JPY', 'KRW', 'MYR', 'IDR', 'VND'].map((c) => (
-                                        <option key={c} value={c}>{c}</option>
-                                    ))}
-                                </select>
+                                    {SUPPORTED_CURRENCIES.map((c) => {
+                                        const isDefault = c === DEFAULT_CURRENCY
+                                        const checked = currencies.includes(c)
+                                        return (
+                                            <label
+                                                key={c}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    padding: '0.5rem 0.625rem',
+                                                    border: `1px solid ${checked ? 'var(--amber)' : 'var(--border)'}`,
+                                                    borderRadius: '6px',
+                                                    background: checked ? 'var(--amber-dim)' : 'var(--surface-2)',
+                                                    cursor: isDefault ? 'not-allowed' : 'pointer',
+                                                    opacity: isDefault ? 0.85 : 1,
+                                                    fontSize: '0.8125rem',
+                                                    color: 'var(--body)',
+                                                }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    disabled={isDefault}
+                                                    onChange={(e) => {
+                                                        if (isDefault) return
+                                                        setCurrencies((prev) =>
+                                                            e.target.checked ? [...prev, c] : prev.filter((x) => x !== c)
+                                                        )
+                                                    }}
+                                                    style={{ accentColor: 'var(--amber)' }}
+                                                />
+                                                <span style={{ fontWeight: 600 }}>{c}</span>
+                                                {isDefault && (
+                                                    <span style={{ color: 'var(--muted)', fontSize: '0.6875rem' }}>(default)</span>
+                                                )}
+                                            </label>
+                                        )
+                                    })}
+                                </div>
                             </div>
-                            <div className="field-group">
+                            <div className="field-group" style={{ gridColumn: '1 / -1' }}>
                                 <label className="field-label">Description</label>
                                 <input
                                     className="field-input"

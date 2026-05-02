@@ -1,6 +1,7 @@
 export interface Balance {
     userId: string
     name: string
+    currency: string
     netBalance: number
 }
 
@@ -9,6 +10,7 @@ export interface Transfer {
     fromName: string
     to: string
     toName: string
+    currency: string
     amount: number
 }
 
@@ -55,6 +57,7 @@ export function simplifyDebts(balances: Balance[]): Transfer[] {
             fromName: debtor.name,
             to: creditor.userId,
             toName: creditor.name,
+            currency: balances[0]?.currency ?? '',
             amount,
         })
 
