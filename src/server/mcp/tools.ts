@@ -45,7 +45,7 @@ export const mcpTools = {
 
     create_expense: {
         description:
-            'Create a new expense in a group. CONFIRM WITH THE USER before calling. Splits are even across all members by default; pass splitAmounts to override.',
+            'Create a new expense in a group. CONFIRM WITH THE USER before calling. Splits are even across all members by default; pass splitUserIds to restrict the even-split to specific members, or splitAmounts for explicit per-user amounts. If both are provided, splitAmounts takes precedence.',
         inputSchema: {
             groupId: groupIdSchema,
             paidByUserId: z.string().length(26).describe('The ULID of the user who paid'),
@@ -69,7 +69,7 @@ export const mcpTools = {
             splitAmounts: z
                 .array(z.object({ userId: z.string().length(26), amount: z.number().positive() }))
                 .optional()
-                .describe('Manual split amounts. Sum must equal `amount`. Mutually exclusive with splitUserIds.'),
+                .describe('Manual split amounts. Sum must equal `amount`. If provided, splitUserIds is ignored.'),
         },
         handler: async (input: {
             groupId: string
@@ -122,7 +122,7 @@ export const mcpTools = {
     },
 
     add_member: {
-        description: 'Add a new member to a group by name. CONFIRM WITH THE USER before calling. Returns the new member ID.',
+        description: "Add a new member to a group by name. CONFIRM WITH THE USER before calling. Returns the new member's ID and name.",
         inputSchema: {
             groupId: groupIdSchema,
             name: z.string().min(1),
