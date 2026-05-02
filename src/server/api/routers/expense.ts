@@ -111,7 +111,7 @@ export const expenseRouter = createTRPCRouter({
                 return { success: true, id: input.groupId }
             } catch (error) {
                 console.error('Error inserting expense:', error)
-                throw new Error('Failed to create expense')
+                throw new Error(error instanceof Error ? error.message : 'Failed to create expense')
             }
         }),
 
