@@ -25,7 +25,7 @@ const BalancesTab = () => {
 
     const utils = api.useUtils()
 
-    const { data: balances, isLoading } = api.expense.getBalances.useQuery(
+    const { data: balances, isLoading, isError, error } = api.expense.getBalances.useQuery(
         { groupId },
         { enabled: !!groupId }
     )
@@ -90,7 +90,13 @@ const BalancesTab = () => {
                         <p style={{ color: 'var(--muted)', fontSize: '0.875rem', padding: '0.5rem 0' }}>Loading…</p>
                     )}
 
-                    {Array.from(transfersByCurrency.entries()).length === 0 && !isLoading && (
+                    {isError && (
+                        <p style={{ color: 'var(--red)', fontSize: '0.875rem', padding: '0.5rem 0' }}>
+                            {error.message ?? 'Could not load balances — try refreshing.'}
+                        </p>
+                    )}
+
+                    {Array.from(transfersByCurrency.entries()).length === 0 && !isLoading && !isError && (
                         <p style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>Everyone is all square</p>
                     )}
 

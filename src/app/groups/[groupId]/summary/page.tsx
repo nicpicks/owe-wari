@@ -19,7 +19,7 @@ const SummaryTab = () => {
         { enabled: !!groupId }
     )
 
-    const { data: balances } = api.expense.getBalances.useQuery(
+    const { data: balances, isLoading: balancesLoading, isError: balancesError } = api.expense.getBalances.useQuery(
         { groupId },
         { enabled: !!groupId }
     )
@@ -123,13 +123,19 @@ const SummaryTab = () => {
                         <div className="section-sub">Net position after all expenses</div>
                     </div>
 
-                    {!balances && (
+                    {balancesLoading && (
                         <p style={{ color: 'var(--muted)', fontSize: '0.875rem', padding: '0.5rem 0' }}>
                             Loading…
                         </p>
                     )}
 
-                    {usersData?.map((u, i) => {
+                    {balancesError && (
+                        <p style={{ color: 'var(--red)', fontSize: '0.875rem', padding: '0.5rem 0' }}>
+                            Could not load balances — try refreshing.
+                        </p>
+                    )}
+
+                    {balances && usersData?.map((u, i) => {
                         const entry = balancesByUser.get(u.id)
                         const rows = entry?.rows.filter((r) => Math.abs(r.netBalance) > 0.005) ?? []
                         return (
