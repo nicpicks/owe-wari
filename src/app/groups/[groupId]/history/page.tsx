@@ -22,6 +22,7 @@ const TYPE_ICON = {
     expense:    { bg: 'rgba(242,160,7,0.12)',  fg: 'var(--amber)', glyph: '+' },
     settlement: { bg: 'rgba(52,211,153,0.12)', fg: 'var(--green)', glyph: '↔' },
     edit:       { bg: 'var(--surface-3)',      fg: 'var(--body)',  glyph: '✏' },
+    delete:     { bg: 'var(--red-dim)',        fg: 'var(--red)',   glyph: '✕' },
 } as const
 
 const HistoryTab = () => {
@@ -164,6 +165,13 @@ const HistoryTab = () => {
                                                 {' edited '}
                                                 <span style={{ fontStyle: 'italic' }}>&quot;{event.title}&quot;</span>{' '}
                                                 <span style={{ color: 'var(--muted)' }}>({humanizeFields(event.fieldsChanged)})</span>
+                                            </>
+                                        )}
+                                        {event.type === 'delete' && (
+                                            <>
+                                                <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.actorName}</span>
+                                                {' deleted '}
+                                                <span style={{ fontStyle: 'italic' }}>&quot;{event.title}&quot;</span>
                                             </>
                                         )}
                                     </div>
