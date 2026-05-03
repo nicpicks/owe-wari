@@ -5,6 +5,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import {
     expenses,
+    expenseAudits,
     expenseSplits,
     groupMembers,
     groupCurrencies,
@@ -54,6 +55,7 @@ export const expenseRouter = createTRPCRouter({
                         .values({
                             groupId: input.groupId,
                             paidByUserId: input.paidByUserId,
+                            createdByUserId: input.paidByUserId,
                             title: input.title,
                             amount: input.amount.toString(),
                             currency: input.currency,
@@ -145,44 +147,61 @@ export const expenseRouter = createTRPCRouter({
         .input(z.object({ groupId: z.string().min(1) }))
         .query(async ({ ctx, input }) => {
             try {
-                const expenseRows = await ctx.db
-                    .select({
-                        id: expenses.id,
-                        title: expenses.title,
-                        amount: expenses.amount,
-                        currency: expenses.currency,
-                        actorId: expenses.paidByUserId,
-                        actorName: users.name,
-                        at: expenses.createdAt,
-                    })
-                    .from(expenses)
-                    .innerJoin(users, eq(users.id, expenses.paidByUserId))
-                    .where(eq(expenses.groupId, input.groupId))
-                    .execute()
-
                 const payerUsers = alias(users, 'payer_users')
                 const receiverUsers = alias(users, 'receiver_users')
 
-                const settlementRows = await ctx.db
-                    .select({
-                        id: settlements.id,
-                        amount: settlements.amount,
-                        currency: settlements.currency,
-                        actorId: settlements.payerId,
-                        actorName: payerUsers.name,
-                        receiverId: settlements.receiverId,
-                        receiverName: receiverUsers.name,
-                        at: settlements.settledAt,
-                    })
-                    .from(settlements)
-                    .innerJoin(payerUsers, eq(payerUsers.id, settlements.payerId))
-                    .innerJoin(receiverUsers, eq(receiverUsers.id, settlements.receiverId))
-                    .where(eq(settlements.groupId, input.groupId))
-                    .execute()
+                const [expenseRows, settlementRows, auditRows] = await Promise.all([
+                    ctx.db
+                        .select({
+                            id: expenses.id,
+                            title: expenses.title,
+                            amount: expenses.amount,
+                            currency: expenses.currency,
+                            actorId: expenses.paidByUserId,
+                            actorName: users.name,
+                            at: expenses.createdAt,
+                        })
+                        .from(expenses)
+                        .innerJoin(users, eq(users.id, expenses.paidByUserId))
+                        .where(eq(expenses.groupId, input.groupId))
+                        .execute(),
+                    ctx.db
+                        .select({
+                            id: settlements.id,
+                            amount: settlements.amount,
+                            currency: settlements.currency,
+                            actorId: settlements.payerId,
+                            actorName: payerUsers.name,
+                            receiverId: settlements.receiverId,
+                            receiverName: receiverUsers.name,
+                            at: settlements.settledAt,
+                        })
+                        .from(settlements)
+                        .innerJoin(payerUsers, eq(payerUsers.id, settlements.payerId))
+                        .innerJoin(receiverUsers, eq(receiverUsers.id, settlements.receiverId))
+                        .where(eq(settlements.groupId, input.groupId))
+                        .execute(),
+                    ctx.db
+                        .select({
+                            id: expenseAudits.id,
+                            expenseId: expenseAudits.expenseId,
+                            title: expenses.title,
+                            actorId: expenseAudits.actorId,
+                            actorName: users.name,
+                            fieldsChanged: expenseAudits.fieldsChanged,
+                            at: expenseAudits.createdAt,
+                        })
+                        .from(expenseAudits)
+                        .innerJoin(expenses, eq(expenses.id, expenseAudits.expenseId))
+                        .innerJoin(users, eq(users.id, expenseAudits.actorId))
+                        .where(eq(expenseAudits.groupId, input.groupId))
+                        .execute(),
+                ])
 
                 const events = [
                     ...expenseRows.map((r) => ({ type: 'expense' as const, ...r })),
                     ...settlementRows.map((r) => ({ type: 'settlement' as const, ...r })),
+                    ...auditRows.map((r) => ({ type: 'edit' as const, ...r })),
                 ]
 
                 events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
@@ -252,12 +271,53 @@ export const expenseRouter = createTRPCRouter({
                 Object.entries(rest).filter(([, v]) => v !== undefined)
             )
             if (Object.keys(patch).length === 0) return { success: true }
+
             try {
-                await ctx.db
-                    .update(expenses)
-                    .set(patch)
-                    .where(eq(expenses.id, expenseId))
-                    .execute()
+                await ctx.db.transaction(async (trx) => {
+                    const [current] = await trx
+                        .select({
+                            groupId: expenses.groupId,
+                            createdByUserId: expenses.createdByUserId,
+                            title: expenses.title,
+                            category: expenses.category,
+                            notes: expenses.notes,
+                            expenseDate: expenses.expenseDate,
+                            paidByUserId: expenses.paidByUserId,
+                        })
+                        .from(expenses)
+                        .where(eq(expenses.id, expenseId))
+                        .execute()
+
+                    if (!current) {
+                        throw new Error('Expense not found')
+                    }
+
+                    const changed: string[] = []
+                    for (const key of Object.keys(patch)) {
+                        const next = patch[key]
+                        const prev = (current as Record<string, unknown>)[key]
+                        if (next instanceof Date && prev instanceof Date) {
+                            if (next.getTime() !== prev.getTime()) changed.push(key)
+                        } else if (next !== prev) {
+                            changed.push(key)
+                        }
+                    }
+
+                    if (changed.length === 0) return
+
+                    await trx
+                        .update(expenses)
+                        .set(patch)
+                        .where(eq(expenses.id, expenseId))
+                        .execute()
+
+                    await trx.insert(expenseAudits).values({
+                        expenseId,
+                        groupId: current.groupId,
+                        actorId: current.createdByUserId,
+                        fieldsChanged: changed,
+                    })
+                })
                 return { success: true }
             } catch (error) {
                 console.error('Error updating expense:', error)

@@ -8,6 +8,7 @@ import {
     numeric,
     pgTableCreator,
     serial,
+    text,
     timestamp,
     varchar,
 } from 'drizzle-orm/pg-core'
@@ -94,6 +95,9 @@ export const expenses = createTable(
         paidByUserId: varchar('paid_by_user_id', { length: 26 })
             .references(() => users.id)
             .notNull(),
+        createdByUserId: varchar('created_by_user_id', { length: 26 })
+            .references(() => users.id)
+            .notNull(),
         title: varchar('title', { length: 256 }).notNull(),
         amount: numeric('amount').notNull(),
         currency: varchar('currency', { length: 3 }).notNull().default('SGD'),
@@ -162,5 +166,29 @@ export const settlements = createTable(
         groupIdIdx: index('idx_settlements_group_id').on(t.groupId),
         payerIdIdx: index('idx_settlements_payer_id').on(t.payerId),
         receiverIdIdx: index('idx_settlements_receiver_id').on(t.receiverId),
+    })
+)
+
+export const expenseAudits = createTable(
+    'expense_audits',
+    {
+        id: serial('id').primaryKey().notNull(),
+        expenseId: integer('expense_id')
+            .references(() => expenses.id)
+            .notNull(),
+        groupId: varchar('group_id', { length: 26 })
+            .references(() => groups.id)
+            .notNull(),
+        actorId: varchar('actor_id', { length: 26 })
+            .references(() => users.id)
+            .notNull(),
+        fieldsChanged: text('fields_changed').array().notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+    },
+    (t) => ({
+        groupIdIdx: index('idx_expense_audits_group_id').on(t.groupId),
+        expenseIdIdx: index('idx_expense_audits_expense_id').on(t.expenseId),
     })
 )

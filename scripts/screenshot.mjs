@@ -160,6 +160,17 @@ async function seedTestGroup() {
         console.log(`   ↔ Settlement: ${users[1].name} → ${users[0].name} SGD 12.50`)
     }
 
+    // Seed one expense edit so history demos the edit event type.
+    const expensesList = await callTRPC('expense.getExpenses', { groupId }, 'query')
+    const firstExpense = expensesList?.[0]
+    if (firstExpense) {
+        await callTRPC('expense.update', {
+            expenseId: firstExpense.id,
+            title: 'Airport taxi (corrected)',
+        })
+        console.log(`   ✏ Edited: expense #${firstExpense.id} → title`)
+    }
+
     return { groupId, users }
 }
 
