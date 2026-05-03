@@ -112,6 +112,7 @@ export const expenses = createTable(
         updatedAt: timestamp('updated_at', { withTimezone: true }).default(
             sql`CURRENT_TIMESTAMP`
         ),
+        deletedAt: timestamp('deleted_at', { withTimezone: true }),
     },
     (t) => ({
         groupIdIdx: index('idx_expenses_group_id').on(t.groupId),
