@@ -14,12 +14,12 @@ npm run dev          # Start Next.js dev server
 npm run build        # Production build
 npm run lint         # ESLint
 
-# Database
+# Database (project uses Drizzle migrations — prefer generate/migrate over push)
 ./start-database.sh  # Start local Postgres via Docker (on Windows: run in WSL)
-npm run db:push      # Push schema changes directly to DB (dev)
-npm run db:generate  # Generate migration files
-npm run db:migrate   # Run migrations
+npm run db:generate  # Generate a new migration from schema changes
+npm run db:migrate   # Apply pending migrations (idempotent — safe to re-run)
 npm run db:studio    # Open Drizzle Studio GUI
+npm run db:push      # Push schema directly to DB without a migration (avoid except for quick local hacks)
 
 # Screenshots
 npm run screenshot   # Capture app screenshots via Puppeteer
@@ -38,16 +38,20 @@ This is a **T3 Stack** app: Next.js App Router + tRPC + Drizzle ORM + PostgreSQL
 
 ### Data model (`src/server/db/schema.ts`)
 All tables are prefixed `owe-wari_` (multi-project schema). Key relationships:
-- `groups` → has many `group_members` (via `users`)
-- `expenses` → paid by one user, split via `expense_splits` (one row per user per expense)
-- `settlements` → records a payment from `payerId` to `receiverId` to track debt repayment
+- `groups` → has `currency` (default), has many `group_members` (via `users`), has many `group_currencies` (which currencies the group accepts)
+- `expenses` → has its own `currency` (one of the group's enabled currencies), `paidByUserId`, `createdByUserId` (snapshot of paidBy at creation, never updated; used as audit actor), and a nullable `deletedAt` (soft delete). Split via `expense_splits` (one row per user per expense).
+- `settlements` → records a payment from `payerId` to `receiverId` in a specific `currency` to clear debt
+- `expense_audits` → one row per expense edit, with `actorId` (= the expense's `createdByUserId` at edit time) and `fieldsChanged` (text[])
 
 ### tRPC API (`src/server/api/`)
-Two routers exposed at `/api/trpc`:
-- `group` — create group, getUsers, getDefaultPayee, updateDefaultPayee
-- `expense` — create expense, getExpenses, getTotalExpenseCost, getBalances, settleUp
+Three routers exposed at `/api/trpc`:
+- `group` — `create`, `getGroup`, `getUsers`, `addMember`, `getCurrencies`, `getDefaultPayee`, `updateDefaultPayee`
+- `expense` — `create`, `update` (writes an `expense_audits` row when fields change), `delete` (soft delete), `getExpense`, `getExpenses` (filters out deleted), `getTotalExpenseCost`, `getBalances`, `settleUp` (accepts per-currency lines), `getHistory` (unified feed of expense / settlement / edit / delete events)
+- `receipt` — `scan` (Gemini-based receipt parsing for prefilling expense forms)
 
-`getBalances` computes net balances by summing paid expenses, owed splits, and settlement amounts per user.
+`getBalances` returns one row per `(user, currency)` pair with non-zero balance — netting paid expenses, owed splits, and settlement amounts.
+
+`getHistory` fans out three parallel selects (expenses, settlements, expense_audits) joined to `users` for actor/receiver names, merges in JS, sorts newest-first. No N+1.
 
 ### Debt simplification (`src/lib/simplify-debts.ts`)
 `simplifyDebts(balances)` runs a greedy min-cash-flow algorithm on the `Balance[]` returned by `getBalances`, reducing N debts to at most N−1 transfers. Used client-side on the balances page.
