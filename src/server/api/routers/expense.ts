@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq, sql, and } from 'drizzle-orm'
+import { eq, sql, and, isNull, isNotNull } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
@@ -13,6 +13,8 @@ import {
     settlements,
     users,
 } from '~/server/db/schema'
+
+const notDeleted = isNull(expenses.deletedAt)
 
 export const expenseRouter = createTRPCRouter({
     create: publicProcedure
@@ -133,7 +135,7 @@ export const expenseRouter = createTRPCRouter({
                         expenseDate: expenses.expenseDate,
                     })
                     .from(expenses)
-                    .where(eq(expenses.groupId, input.groupId))
+                    .where(and(eq(expenses.groupId, input.groupId), notDeleted))
                     .execute()
 
                 return expensesInGroup
@@ -150,7 +152,7 @@ export const expenseRouter = createTRPCRouter({
                 const payerUsers = alias(users, 'payer_users')
                 const receiverUsers = alias(users, 'receiver_users')
 
-                const [expenseRows, settlementRows, auditRows] = await Promise.all([
+                const [expenseRows, settlementRows, auditRows, deleteRows] = await Promise.all([
                     ctx.db
                         .select({
                             id: expenses.id,
@@ -196,12 +198,27 @@ export const expenseRouter = createTRPCRouter({
                         .innerJoin(users, eq(users.id, expenseAudits.actorId))
                         .where(eq(expenseAudits.groupId, input.groupId))
                         .execute(),
+                    ctx.db
+                        .select({
+                            id: expenses.id,
+                            title: expenses.title,
+                            actorId: expenses.createdByUserId,
+                            actorName: users.name,
+                            at: expenses.deletedAt,
+                        })
+                        .from(expenses)
+                        .innerJoin(users, eq(users.id, expenses.createdByUserId))
+                        .where(and(eq(expenses.groupId, input.groupId), isNotNull(expenses.deletedAt)))
+                        .execute(),
                 ])
 
                 const events = [
                     ...expenseRows.map((r) => ({ type: 'expense' as const, ...r })),
                     ...settlementRows.map((r) => ({ type: 'settlement' as const, ...r })),
                     ...auditRows.map((r) => ({ type: 'edit' as const, ...r })),
+                    ...deleteRows
+                        .filter((r): r is typeof r & { at: Date } => r.at !== null)
+                        .map((r) => ({ type: 'delete' as const, ...r })),
                 ]
 
                 events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
@@ -231,7 +248,7 @@ export const expenseRouter = createTRPCRouter({
                     })
                     .from(expenses)
                     .innerJoin(users, eq(users.id, expenses.paidByUserId))
-                    .where(eq(expenses.id, input.expenseId))
+                    .where(and(eq(expenses.id, input.expenseId), notDeleted))
                     .execute()
 
                 if (!expense) throw new Error('Expense not found')
@@ -278,6 +295,7 @@ export const expenseRouter = createTRPCRouter({
                         .select({
                             groupId: expenses.groupId,
                             createdByUserId: expenses.createdByUserId,
+                            deletedAt: expenses.deletedAt,
                             title: expenses.title,
                             category: expenses.category,
                             notes: expenses.notes,
@@ -290,6 +308,9 @@ export const expenseRouter = createTRPCRouter({
 
                     if (!current) {
                         throw new Error('Expense not found')
+                    }
+                    if (current.deletedAt !== null) {
+                        throw new Error('Cannot edit a deleted expense')
                     }
 
                     const changed: string[] = []
@@ -345,7 +366,8 @@ export const expenseRouter = createTRPCRouter({
                     .where(
                         and(
                             eq(expenses.groupId, input.groupId),
-                            eq(expenses.currency, group.defaultCode)
+                            eq(expenses.currency, group.defaultCode),
+                            notDeleted
                         )
                     )
                     .execute()
@@ -356,7 +378,8 @@ export const expenseRouter = createTRPCRouter({
                     .where(
                         and(
                             eq(expenses.groupId, input.groupId),
-                            sql`${expenses.currency} <> ${group.defaultCode}`
+                            sql`${expenses.currency} <> ${group.defaultCode}`,
+                            notDeleted
                         )
                     )
                     .execute()
@@ -394,7 +417,7 @@ export const expenseRouter = createTRPCRouter({
                         total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
                     })
                     .from(expenses)
-                    .where(eq(expenses.groupId, groupId))
+                    .where(and(eq(expenses.groupId, groupId), notDeleted))
                     .groupBy(expenses.paidByUserId, expenses.currency)
                     .execute()
 
@@ -406,7 +429,7 @@ export const expenseRouter = createTRPCRouter({
                     })
                     .from(expenseSplits)
                     .innerJoin(expenses, eq(expenseSplits.expenseId, expenses.id))
-                    .where(eq(expenses.groupId, groupId))
+                    .where(and(eq(expenses.groupId, groupId), notDeleted))
                     .groupBy(expenseSplits.userId, expenses.currency)
                     .execute()
 
@@ -473,6 +496,22 @@ export const expenseRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error getting balances:', error)
                 throw new Error(error instanceof Error ? error.message : 'Failed to get balances')
+            }
+        }),
+
+    delete: publicProcedure
+        .input(z.object({ expenseId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                await ctx.db
+                    .update(expenses)
+                    .set({ deletedAt: new Date() })
+                    .where(and(eq(expenses.id, input.expenseId), notDeleted))
+                    .execute()
+                return { success: true }
+            } catch (error) {
+                console.error('Error deleting expense:', error)
+                throw new Error('Failed to delete expense')
             }
         }),
 
