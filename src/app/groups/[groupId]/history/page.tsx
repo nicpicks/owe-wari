@@ -6,6 +6,24 @@ import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
 import { formatRelative, formatAbsolute } from '~/lib/format-date'
 
+const FIELD_LABELS: Record<string, string> = {
+    title: 'title',
+    category: 'category',
+    notes: 'notes',
+    expenseDate: 'date',
+    paidByUserId: 'payer',
+}
+
+function humanizeFields(fields: string[]): string {
+    return fields.map((f) => FIELD_LABELS[f] ?? f).join(', ')
+}
+
+const TYPE_ICON = {
+    expense:    { bg: 'rgba(242,160,7,0.12)',  fg: 'var(--amber)', glyph: '+' },
+    settlement: { bg: 'rgba(52,211,153,0.12)', fg: 'var(--green)', glyph: '↔' },
+    edit:       { bg: 'var(--surface-3)',      fg: 'var(--body)',  glyph: '✏' },
+} as const
+
 const HistoryTab = () => {
     const router = useRouter()
     const pathname = usePathname()
@@ -66,7 +84,7 @@ const HistoryTab = () => {
                     <div className="card-dark anim-fade-up d-1">
                         {events.map((event, i) => {
                             const initial = event.actorName.charAt(0).toUpperCase()
-                            const amount = formatAmount(parseFloat(event.amount), event.currency)
+                            const icon = TYPE_ICON[event.type]
                             const relative = formatRelative(event.at)
                             const absolute = formatAbsolute(event.at)
 
@@ -83,8 +101,8 @@ const HistoryTab = () => {
                                             width: '20px',
                                             height: '20px',
                                             borderRadius: '4px',
-                                            background: event.type === 'expense' ? 'rgba(242,160,7,0.12)' : 'rgba(52,211,153,0.12)',
-                                            color: event.type === 'expense' ? 'var(--amber)' : 'var(--green)',
+                                            background: icon.bg,
+                                            color: icon.fg,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
@@ -93,7 +111,7 @@ const HistoryTab = () => {
                                             flexShrink: 0,
                                         }}
                                     >
-                                        {event.type === 'expense' ? '+' : '↔'}
+                                        {icon.glyph}
                                     </div>
 
                                     {/* Avatar */}
@@ -119,20 +137,33 @@ const HistoryTab = () => {
 
                                     {/* Description */}
                                     <div style={{ flex: 1, minWidth: 0, fontSize: '0.9375rem', color: 'var(--body)' }}>
-                                        {event.type === 'expense' ? (
+                                        {event.type === 'expense' && (
                                             <>
                                                 <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.actorName}</span>
                                                 {' added '}
                                                 <span style={{ fontStyle: 'italic' }}>&quot;{event.title}&quot;</span>{' '}
-                                                <span className="font-mono" style={{ color: 'var(--amber)' }}>{amount}</span>
+                                                <span className="font-mono" style={{ color: 'var(--amber)' }}>
+                                                    {formatAmount(parseFloat(event.amount), event.currency)}
+                                                </span>
                                             </>
-                                        ) : (
+                                        )}
+                                        {event.type === 'settlement' && (
                                             <>
                                                 <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.actorName}</span>
                                                 {' settled '}
-                                                <span className="font-mono" style={{ color: 'var(--amber)' }}>{amount}</span>
+                                                <span className="font-mono" style={{ color: 'var(--amber)' }}>
+                                                    {formatAmount(parseFloat(event.amount), event.currency)}
+                                                </span>
                                                 {' with '}
                                                 <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.receiverName}</span>
+                                            </>
+                                        )}
+                                        {event.type === 'edit' && (
+                                            <>
+                                                <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.actorName}</span>
+                                                {' edited '}
+                                                <span style={{ fontStyle: 'italic' }}>&quot;{event.title}&quot;</span>{' '}
+                                                <span style={{ color: 'var(--muted)' }}>({humanizeFields(event.fieldsChanged)})</span>
                                             </>
                                         )}
                                     </div>
