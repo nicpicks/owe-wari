@@ -171,6 +171,13 @@ async function seedTestGroup() {
         console.log(`   ✏ Edited: expense #${firstExpense.id} → title`)
     }
 
+    // Seed one delete so history demos the delete event type.
+    const deletable = expensesList?.[1]
+    if (deletable) {
+        await callTRPC('expense.delete', { expenseId: deletable.id })
+        console.log(`   ✕ Deleted: expense #${deletable.id}`)
+    }
+
     return { groupId, users }
 }
 
