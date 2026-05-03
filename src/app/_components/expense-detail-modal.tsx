@@ -45,6 +45,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     )
 
     const [isEditing, setIsEditing] = useState(false)
+    const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
     const [title, setTitle] = useState('')
     const [category, setCategory] = useState('General')
     const [notes, setNotes] = useState('')
@@ -70,7 +71,10 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     }, [expenseId, onClose])
 
     useEffect(() => {
-        if (expenseId === null) setIsEditing(false)
+        if (expenseId === null) {
+            setIsEditing(false)
+            setIsConfirmingDelete(false)
+        }
     }, [expenseId])
 
     const updateExpense = api.expense.update.useMutation({
@@ -83,6 +87,23 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
         onError: (e) => {
             console.error(e)
             alert('Failed to update expense')
+        },
+    })
+
+    const deleteExpense = api.expense.delete.useMutation({
+        onSuccess: async () => {
+            await Promise.all([
+                utils.expense.getExpense.invalidate({ expenseId: expenseId! }),
+                utils.expense.getExpenses.invalidate({ groupId }),
+                utils.expense.getTotalExpenseCost.invalidate({ groupId }),
+                utils.expense.getBalances.invalidate({ groupId }),
+                utils.expense.getHistory.invalidate({ groupId }),
+            ])
+            onClose()
+        },
+        onError: (e) => {
+            console.error(e)
+            alert('Failed to delete expense')
         },
     })
 
@@ -124,7 +145,11 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
             >
                 {/* Header */}
                 <div className="mb-4 flex items-start justify-between gap-2">
-                    {isEditing ? (
+                    {isConfirmingDelete ? (
+                        <span style={{ color: 'var(--heading)', fontWeight: 600, alignSelf: 'center' }}>
+                            Delete this expense?
+                        </span>
+                    ) : isEditing ? (
                         <input
                             className="field-input"
                             value={title}
@@ -137,15 +162,43 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                         </h2>
                     )}
                     <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                        {!isEditing && expense && (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="btn-ghost text-sm"
-                                aria-label="Edit"
-                            >
-                                Edit
-                            </button>
-                        )}
+                        {isConfirmingDelete ? (
+                            <>
+                                <button
+                                    onClick={() => setIsConfirmingDelete(false)}
+                                    className="btn-ghost text-sm"
+                                    disabled={deleteExpense.isPending}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => expense && deleteExpense.mutate({ expenseId: expense.id })}
+                                    className="btn-ghost text-sm"
+                                    style={{ color: 'var(--red)' }}
+                                    disabled={deleteExpense.isPending}
+                                >
+                                    {deleteExpense.isPending ? 'Deleting…' : 'Delete'}
+                                </button>
+                            </>
+                        ) : !isEditing && expense ? (
+                            <>
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="btn-ghost text-sm"
+                                    aria-label="Edit"
+                                >
+                                    Edit
+                                </button>
+                                <button
+                                    onClick={() => setIsConfirmingDelete(true)}
+                                    className="btn-ghost text-sm"
+                                    style={{ color: 'var(--red)' }}
+                                    aria-label="Delete"
+                                >
+                                    Delete
+                                </button>
+                            </>
+                        ) : null}
                         <button
                             onClick={onClose}
                             className="btn-ghost text-xl leading-none"
