@@ -62,5 +62,8 @@ Three routers exposed at `/api/trpc`:
 - Client components use `api` from `~/trpc/react`; server components use the server caller from `~/trpc/server`
 - Styling uses Tailwind + DaisyUI with custom CSS variables defined in `src/styles/globals.css` (e.g., `var(--green)`, `var(--red)`, `var(--muted)`, `var(--heading)`, `var(--surface-3)`)
 
+### MCP server
+The app exposes an MCP endpoint at `/api/mcp/mcp` for AI clients. When you add or change a tRPC procedure, see [`docs/MCP.md`](docs/MCP.md) — you may need to update the tool catalog in `src/server/mcp/tools.ts` to match.
+
 ### Path aliases
 `~` maps to `./src` (configured in `tsconfig.json`).
