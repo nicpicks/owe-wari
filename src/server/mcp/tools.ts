@@ -34,15 +34,6 @@ export const mcpTools = {
             api.expense.getExpenses({ groupId }),
     },
 
-    get_expense: {
-        description: 'Get full details of a single expense by its numeric ID, including the per-user split breakdown.',
-        inputSchema: {
-            expenseId: z.number().int().positive().describe('The numeric expense ID'),
-        },
-        handler: async ({ expenseId }: { expenseId: number }) =>
-            api.expense.getExpense({ expenseId }),
-    },
-
     create_expense: {
         description:
             'Create a new expense in a group. CONFIRM WITH THE USER before calling. Splits are even across all members by default; pass splitUserIds to restrict the even-split to specific members, or splitAmounts for explicit per-user amounts. If both are provided, splitAmounts takes precedence.',

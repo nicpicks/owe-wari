@@ -20,7 +20,6 @@ If you change the **input shape** of an existing procedure (rename a field, add 
 |---|---|---|---|
 | `get_group` | `group.getGroup` + `group.getUsers` + `group.getCurrencies` | no | Single round-trip combining group + members + currencies |
 | `list_expenses` | `expense.getExpenses` | no | |
-| `get_expense` | `expense.getExpense` | no | Includes per-user split rows |
 | `create_expense` | `expense.create` | yes | Tool description tells the AI to confirm with the user first |
 | `get_balances` | `expense.getBalances` | no | Per-(user, currency) net balances |
 | `settle_up` | `expense.settleUp` | yes | Multi-currency `lines` array |
@@ -103,3 +102,7 @@ Then restart the client.
 ## Production deployment
 
 `MCP_API_TOKEN` must be set in the Vercel project's environment variables (Settings → Environment Variables). Set it for **Production**, **Preview**, and **Development** scopes — the env validator in `src/env.js` requires it at build time.
+
+## Known limitations
+
+- **No `get_expense` tool.** The underlying `expense.getExpense` tRPC procedure looks up expenses by numeric ID without a group scope, which would let a token holder enumerate expenses across groups. Once the procedure is updated to require and validate `groupId`, the tool can be re-added. Use `list_expenses(groupId)` to enumerate expenses within a known group.
