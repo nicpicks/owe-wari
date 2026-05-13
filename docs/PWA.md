@@ -27,14 +27,16 @@ Progressive Web App rollout in four phases, from basic installability to full of
 
 ---
 
-## Phase 2 – Offline shell
+## Phase 2 – Offline shell ✅ (done)
 
-- [ ] Verify offline shell loads after first visit (run Lighthouse PWA audit)
-- [ ] Confirm static assets (CSS, fonts, JS bundles) are precached by next-pwa defaults
-- [ ] Add offline fallback page `src/app/offline/page.tsx` — shown when a navigation request fails offline
-  - Register fallback in workbox options: `fallbacks: { document: '/offline' }`
-- [ ] Add `NetworkStatusBanner` component — appears at top of screen when the browser goes offline mid-session
-  - Subscribe to `window online/offline` events; dismiss automatically when connection is restored
+- [ ] Verify offline shell loads after first visit (run Lighthouse PWA audit — manual step)
+- [x] Confirm static assets (CSS, fonts, JS bundles) are precached by next-pwa defaults
+- [x] Add offline fallback page `src/app/offline/page.tsx` — shown when a navigation request fails offline
+  - Registered fallback in `next.config.js`: `fallbacks: { document: '/offline' }`
+- [x] Add `NetworkStatusBanner` component (`src/app/_components/network-status-banner.tsx`)
+  - Fixed banner at top of screen; subscribes to `window online/offline` events
+  - Shows "You're offline — changes won't save" when disconnected
+  - Shows "Back online" in green for 2.5 s when connection is restored, then hides
 
 ---
 
