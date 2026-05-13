@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
+import { useGroupIdentity } from './use-group-identity'
 
 const CATEGORIES = ['General', 'Food', 'Transport', 'Accommodation', 'Groceries', 'Others'] as const
 
@@ -35,6 +36,7 @@ interface ExpenseDetailModalProps {
 
 export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetailModalProps) {
     const utils = api.useUtils()
+    const { identity } = useGroupIdentity(groupId)
     const { data: expense, isLoading } = api.expense.getExpense.useQuery(
         { expenseId: expenseId! },
         { enabled: expenseId !== null }
@@ -121,6 +123,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
             notes,
             expenseDate: new Date(expenseDate),
             paidByUserId,
+            actorId: identity ?? undefined,
         })
     }
 

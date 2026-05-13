@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '~/trpc/react'
+import { useGroupIdentity } from './use-group-identity'
 
 interface User {
     id: string
@@ -94,6 +95,8 @@ export default function CreateExpense() {
     const [scannedLineItems, setScannedLineItems] = useState<LineItem[]>([])
     const [lineItemMemberIds, setLineItemMemberIds] = useState<string[]>([])
 
+    const { identity } = useGroupIdentity(groupId)
+
     const { data: defaultPayee } = api.group.getDefaultPayee.useQuery(
         { groupId: groupId ?? '' },
         { enabled: !!groupId }
@@ -125,14 +128,26 @@ export default function CreateExpense() {
             setIsChecked(init)
             setManualAmounts(initAmounts)
             setLineItemMemberIds(usersData.map((u) => u.id))
-            setPaidByUserId(defaultPayee ?? usersData[0]?.id ?? '')
+            const userIds = new Set(usersData.map((u) => u.id))
+            const preferred =
+                (identity && userIds.has(identity) ? identity : null) ??
+                defaultPayee ??
+                usersData[0]?.id ??
+                ''
+            setPaidByUserId(preferred)
         }
         if (usersError) console.error('Error fetching users:', usersError)
     }, [usersData, usersError])
 
     useEffect(() => {
-        if (defaultPayee) setPaidByUserId(defaultPayee)
-    }, [defaultPayee])
+        if (!usersData) return
+        const userIds = new Set(usersData.map((u) => u.id))
+        if (identity && userIds.has(identity)) {
+            setPaidByUserId(identity)
+        } else if (defaultPayee) {
+            setPaidByUserId(defaultPayee)
+        }
+    }, [identity, defaultPayee, usersData])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -256,12 +271,14 @@ export default function CreateExpense() {
                 .map(([userId, amt]) => ({ userId, amount: amt }))
             createExpense.mutate({
                 title, groupId: groupId ?? '', paidByUserId,
+                createdByUserId: identity ?? undefined,
                 amount, currency, category, notes, expenseDate, splitAmounts,
             })
         } else {
             const payload = activeModeConfig.toPayload(splitCtx)
             createExpense.mutate({
                 title, groupId: groupId ?? '', paidByUserId,
+                createdByUserId: identity ?? undefined,
                 amount, currency, category, notes, expenseDate, ...payload,
             })
         }

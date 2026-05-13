@@ -22,6 +22,7 @@ export const expenseRouter = createTRPCRouter({
             z.object({
                 groupId: z.string(),
                 paidByUserId: z.string(),
+                createdByUserId: z.string().optional(),
                 title: z.string().min(1),
                 amount: z.number(),
                 currency: z.string().min(1),
@@ -57,7 +58,7 @@ export const expenseRouter = createTRPCRouter({
                         .values({
                             groupId: input.groupId,
                             paidByUserId: input.paidByUserId,
-                            createdByUserId: input.paidByUserId,
+                            createdByUserId: input.createdByUserId ?? input.paidByUserId,
                             title: input.title,
                             amount: input.amount.toString(),
                             currency: input.currency,
@@ -280,10 +281,11 @@ export const expenseRouter = createTRPCRouter({
                 notes: z.string().optional(),
                 expenseDate: z.date().optional(),
                 paidByUserId: z.string().optional(),
+                actorId: z.string().optional(),
             })
         )
         .mutation(async ({ ctx, input }) => {
-            const { expenseId, ...rest } = input
+            const { expenseId, actorId, ...rest } = input
             const patch = Object.fromEntries(
                 Object.entries(rest).filter(([, v]) => v !== undefined)
             )
@@ -335,7 +337,7 @@ export const expenseRouter = createTRPCRouter({
                     await trx.insert(expenseAudits).values({
                         expenseId,
                         groupId: current.groupId,
-                        actorId: current.createdByUserId,
+                        actorId: actorId ?? current.createdByUserId,
                         fieldsChanged: changed,
                     })
                 })
