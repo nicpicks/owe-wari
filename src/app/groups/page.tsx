@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { RecentGroupsList } from './recent-groups-list'
 
 export const metadata: Metadata = {
@@ -19,7 +19,9 @@ export default async function Groups() {
                     </Link>
                 </div>
             </div>
-            <div>{/* <RecentGroupsList /> */}</div>
+            <div className="mt-4">
+                <RecentGroupsList />
+            </div>
         </>
     )
 }
