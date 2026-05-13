@@ -1,6 +1,5 @@
 'use client'
 
-import { use } from 'react'
 import { IdentifySelfModal } from '~/app/_components/identify-self-modal'
 
 export default function GroupLayout({
@@ -8,9 +7,9 @@ export default function GroupLayout({
     params,
 }: {
     children: React.ReactNode
-    params: Promise<{ groupId: string }>
+    params: { groupId: string }
 }) {
-    const { groupId } = use(params)
+    const { groupId } = params
     return (
         <>
             {children}
