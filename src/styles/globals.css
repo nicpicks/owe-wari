@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ─── Design Tokens ─────────────────────────────────────────────── */
-:root {
+:root, [data-theme="dark"] {
   --ink:        #0B0B0B;
   --surface:    #121212;
   --surface-2:  #1A1A1A;
@@ -20,6 +20,27 @@
   --green-dim:  rgba(52, 211, 153, 0.12);
   --red:        #F87171;
   --red-dim:    rgba(248, 113, 113, 0.12);
+  --tab-bar-bg: rgba(11, 11, 11, 0.92);
+}
+
+[data-theme="light"] {
+  --ink:        #F5F2EB;
+  --surface:    #FFFFFF;
+  --surface-2:  #EEE9DF;
+  --surface-3:  #E5DFD3;
+  --border:     #D9D2C5;
+  --border-2:   #C5BCAD;
+  --muted:      #9C9387;
+  --dim:        #6E6459;
+  --body:       #3A342C;
+  --heading:    #110F0B;
+  --amber:      #A06A00;
+  --amber-dim:  rgba(160, 106, 0, 0.12);
+  --green:      #047857;
+  --green-dim:  rgba(4, 120, 87, 0.10);
+  --red:        #B91C1C;
+  --red-dim:    rgba(185, 28, 28, 0.10);
+  --tab-bar-bg: rgba(245, 242, 235, 0.92);
 }
 
 /* ─── Base ──────────────────────────────────────────────────────── */
@@ -77,7 +98,7 @@ body::after {
   scrollbar-width: none;
   position: sticky;
   top: 0;
-  background: rgba(11, 11, 11, 0.92);
+  background: var(--tab-bar-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   z-index: 20;
