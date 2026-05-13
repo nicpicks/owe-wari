@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { RecentGroupsList } from './groups/recent-groups-list'
 
 export default function Home() {
     return (
@@ -203,6 +204,8 @@ export default function Home() {
                         </button>
                     </Link>
                 </div>
+
+                <RecentGroupsList />
 
                 {/* Footer note */}
                 <p
