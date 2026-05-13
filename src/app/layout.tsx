@@ -29,7 +29,23 @@ const jetbrains = JetBrains_Mono({
 export const metadata = {
     title: 'owe-wari — split expenses, zero drama',
     description: 'Track group expenses and settle up without the awkwardness.',
-    icons: [{ rel: 'icon', url: '/favicon.ico' }],
+    manifest: '/manifest.json',
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: 'black-translucent' as const,
+        title: 'owe-wari',
+    },
+    icons: [
+        { rel: 'icon', url: '/favicon.ico' },
+        { rel: 'apple-touch-icon', url: '/icons/apple-touch-icon.png' },
+    ],
+}
+
+export const viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    viewportFit: 'cover' as const,
+    themeColor: '#F2A007',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

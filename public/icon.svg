@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Dark background circle -->
+  <circle cx="256" cy="256" r="256" fill="#0B0B0B"/>
+  <!-- Stylized "OW" lettering in amber, bold, centered -->
+  <text
+    x="256"
+    y="310"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="190"
+    font-weight="700"
+    letter-spacing="-10"
+    fill="#F2A007"
+    text-anchor="middle"
+    dominant-baseline="auto"
+  >OW</text>
+  <!-- Decorative split/divide line beneath the letters -->
+  <line x1="140" y1="345" x2="372" y2="345" stroke="#F2A007" stroke-width="7" stroke-linecap="round"/>
+  <!-- Small dot below the line (divide symbol lower dot) -->
+  <circle cx="256" cy="378" r="9" fill="#F2A007"/>
+</svg>
