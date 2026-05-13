@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Tabs from '~/app/_components/tabs'
 import { api } from '~/trpc/react'
+import { useGroupIdentity } from '~/app/_components/use-group-identity'
 
 interface User {
     id: string
@@ -18,6 +19,8 @@ const SettingsTab = () => {
     const [users, setUsers] = useState<User[]>([])
     const [copied, setCopied] = useState(false)
     const [newMemberName, setNewMemberName] = useState('')
+    const { identity, setIdentity, clearIdentity } = useGroupIdentity(groupId)
+    const identityName = users.find((u) => u.id === identity)?.name
 
     const handleCopyLink = () => {
         if (!groupId) return
@@ -122,8 +125,54 @@ const SettingsTab = () => {
                         </div>
                     </div>
 
-                    {/* Default payee */}
+                    {/* You on this device */}
                     <div className="card-dark anim-fade-up d-2" style={{ marginBottom: '1rem' }}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
+                                You on this device
+                            </div>
+                            <div className="section-sub">
+                                {identity && identityName
+                                    ? `New expenses you add here will be logged under ${identityName}.`
+                                    : 'Pick yourself so new expenses are logged under your name on this device.'}
+                            </div>
+                        </div>
+
+                        <div className="field-group">
+                            <label className="field-label">I am</label>
+                            <select
+                                className="field-select"
+                                value={identity ?? ''}
+                                onChange={(e) => {
+                                    const value = e.target.value
+                                    if (value) setIdentity(value)
+                                    else clearIdentity()
+                                }}
+                            >
+                                <option value="">Not set</option>
+                                {users.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {identity && (
+                            <div style={{ marginTop: '1rem' }}>
+                                <button
+                                    type="button"
+                                    className="btn-ghost"
+                                    onClick={clearIdentity}
+                                >
+                                    Forget me on this device
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Default payee */}
+                    <div className="card-dark anim-fade-up d-3" style={{ marginBottom: '1rem' }}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Default Payer
@@ -158,7 +207,7 @@ const SettingsTab = () => {
                     </div>
 
                     {/* Invite link */}
-                    <div className="card-dark anim-fade-up d-3">
+                    <div className="card-dark anim-fade-up d-4">
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Invite Link
