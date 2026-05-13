@@ -38,12 +38,16 @@ const SummaryTab = () => {
         : null
 
     const otherCurrenciesOutstanding = balances
-        ? new Set(
+        ? Array.from(
               balances
                   .filter((b) => b.currency !== defaultCurrency && b.netBalance < -0.005)
-                  .map((b) => b.currency)
-          ).size
-        : 0
+                  .reduce((map, b) => {
+                      map.set(b.currency, (map.get(b.currency) ?? 0) + Math.abs(b.netBalance))
+                      return map
+                  }, new Map<string, number>())
+                  .entries()
+          ).map(([currency, total]) => ({ currency, total }))
+        : []
 
     const balancesByUser = new Map<
         string,
@@ -84,12 +88,22 @@ const SummaryTab = () => {
                                 ? formatAmount(totals.defaultTotal, totals.defaultCurrency)
                                 : '—'}
                         </div>
-                        {totals && totals.otherCurrencyCount > 0 && (
-                            <div style={{ marginTop: '0.375rem', fontSize: '0.6875rem', color: 'var(--muted)' }}>
-                                + {totals.otherCurrencyCount} expense
-                                {totals.otherCurrencyCount !== 1 ? 's' : ''} in other currencies
+                        {totals && totals.otherTotals.map(({ currency, total }) => (
+                            <div
+                                key={currency}
+                                style={{
+                                    marginTop: '0.375rem',
+                                    fontFamily: 'var(--font-cormorant), serif',
+                                    fontSize: '1.125rem',
+                                    fontWeight: 600,
+                                    color: 'var(--muted)',
+                                    letterSpacing: '-0.01em',
+                                    lineHeight: 1,
+                                }}
+                            >
+                                {formatAmount(total, currency)}
                             </div>
-                        )}
+                        ))}
                     </div>
                     <div className="card-dark" style={{ padding: '1.25rem' }}>
                         <div className="section-sub" style={{ marginBottom: '0.5rem' }}>Outstanding</div>
@@ -107,12 +121,23 @@ const SummaryTab = () => {
                                 ? formatAmount(totalOwedDefault, defaultCurrency)
                                 : '—'}
                         </div>
-                        {otherCurrenciesOutstanding > 0 && (
-                            <div style={{ marginTop: '0.375rem', fontSize: '0.6875rem', color: 'var(--muted)' }}>
-                                + {otherCurrenciesOutstanding} other currenc
-                                {otherCurrenciesOutstanding !== 1 ? 'ies' : 'y'} outstanding
+                        {otherCurrenciesOutstanding.map(({ currency, total }) => (
+                            <div
+                                key={currency}
+                                style={{
+                                    marginTop: '0.375rem',
+                                    fontFamily: 'var(--font-cormorant), serif',
+                                    fontSize: '1.125rem',
+                                    fontWeight: 600,
+                                    color: 'var(--red)',
+                                    opacity: 0.6,
+                                    letterSpacing: '-0.01em',
+                                    lineHeight: 1,
+                                }}
+                            >
+                                {formatAmount(total, currency)}
                             </div>
-                        )}
+                        ))}
                     </div>
                 </div>
 
