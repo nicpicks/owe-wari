@@ -345,6 +345,67 @@ export default function CreateExpense() {
                             />
                         </div>
 
+                        {/* Amount hero */}
+                        <div style={{
+                            textAlign: 'center',
+                            paddingBottom: '1.375rem',
+                            marginBottom: '1.375rem',
+                            borderBottom: '1px solid var(--border)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                                <select
+                                    value={currency}
+                                    onChange={(e) => setCurrency(e.target.value)}
+                                    style={{
+                                        background: 'var(--surface-3)',
+                                        border: '1px solid var(--border-2)',
+                                        borderRadius: '6px',
+                                        color: 'var(--dim)',
+                                        fontSize: '0.8125rem',
+                                        fontWeight: 600,
+                                        letterSpacing: '0.04em',
+                                        padding: '0.3125rem 1.875rem 0.3125rem 0.625rem',
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                        appearance: 'none',
+                                        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23717171' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+                                        backgroundRepeat: 'no-repeat',
+                                        backgroundPosition: 'right 0.5rem center',
+                                        flexShrink: 0,
+                                        alignSelf: 'center',
+                                    }}
+                                >
+                                    {(groupCurrenciesData ?? []).map(({ code }) => (
+                                        <option key={code} value={code}>{code}</option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    className="no-spinner"
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    value={amount || ''}
+                                    onChange={(e) => setAmount(Number(e.target.value))}
+                                    required
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        outline: 'none',
+                                        fontSize: '2.75rem',
+                                        fontWeight: 600,
+                                        fontFamily: 'var(--font-mono), monospace',
+                                        color: amount > 0 ? 'var(--heading)' : 'var(--muted)',
+                                        textAlign: 'center',
+                                        width: '8ch',
+                                        padding: 0,
+                                        lineHeight: 1.15,
+                                    }}
+                                />
+                            </div>
+                        </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
                             <div className="field-group" style={{ gridColumn: '1 / -1' }}>
                                 <label className="field-label">What for</label>
@@ -356,35 +417,6 @@ export default function CreateExpense() {
                                     onChange={(e) => setTitle(e.target.value)}
                                     required
                                 />
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                <div className="field-group" style={{ flex: 1 }}>
-                                    <label className="field-label">Amount</label>
-                                    <input
-                                        className="field-input"
-                                        type="number"
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
-                                        value={amount || ''}
-                                        onChange={(e) => setAmount(Number(e.target.value))}
-                                        required
-                                        style={{ fontFamily: 'var(--font-mono), monospace', fontSize: '1.0625rem' }}
-                                    />
-                                </div>
-                                <div className="field-group" style={{ width: '90px' }}>
-                                    <label className="field-label">Currency</label>
-                                    <select
-                                        className="field-select"
-                                        value={currency}
-                                        onChange={(e) => setCurrency(e.target.value)}
-                                    >
-                                        {(groupCurrenciesData ?? []).map(({ code }) => (
-                                            <option key={code} value={code}>{code}</option>
-                                        ))}
-                                    </select>
-                                </div>
                             </div>
 
                             <div className="field-group">
@@ -410,7 +442,7 @@ export default function CreateExpense() {
                                 </select>
                             </div>
 
-                            <div className="field-group">
+                            <div className="field-group" style={{ gridColumn: '1 / -1' }}>
                                 <label className="field-label">Paid by</label>
                                 <select
                                     className="field-select"
@@ -524,6 +556,7 @@ export default function CreateExpense() {
                                         {/* Amount — fixed width, no spinners */}
                                         <input
                                             type="number"
+                                            inputMode="decimal"
                                             min="0"
                                             step="0.01"
                                             value={item.amount || ''}
@@ -727,6 +760,7 @@ export default function CreateExpense() {
                                         <label style={{ flex: 1 }}>{user.name}</label>
                                         <input
                                             type="number"
+                                            inputMode="decimal"
                                             min="0"
                                             step="0.01"
                                             placeholder="0.00"
