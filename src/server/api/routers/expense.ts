@@ -357,7 +357,7 @@ export const expenseRouter = createTRPCRouter({
                     .execute()
 
                 if (!group) {
-                    return { defaultTotal: 0, defaultCurrency: 'SGD', otherCurrencyCount: 0 }
+                    return { defaultTotal: 0, defaultCurrency: 'SGD', otherTotals: [] }
                 }
 
                 const [defaultRow] = await ctx.db
@@ -372,8 +372,11 @@ export const expenseRouter = createTRPCRouter({
                     )
                     .execute()
 
-                const [otherRow] = await ctx.db
-                    .select({ count: sql<string>`COUNT(*)` })
+                const otherRows = await ctx.db
+                    .select({
+                        currency: expenses.currency,
+                        total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+                    })
                     .from(expenses)
                     .where(
                         and(
@@ -382,12 +385,16 @@ export const expenseRouter = createTRPCRouter({
                             notDeleted
                         )
                     )
+                    .groupBy(expenses.currency)
                     .execute()
 
                 return {
                     defaultTotal: parseFloat(defaultRow?.total ?? '0'),
                     defaultCurrency: group.defaultCode,
-                    otherCurrencyCount: parseInt(otherRow?.count ?? '0', 10),
+                    otherTotals: otherRows.map((r) => ({
+                        currency: r.currency,
+                        total: parseFloat(r.total),
+                    })),
                 }
             } catch (error) {
                 console.error('Error getting total expense cost:', error)
