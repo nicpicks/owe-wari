@@ -508,6 +508,82 @@ export const expenseRouter = createTRPCRouter({
             }
         }),
 
+    getUserSpend: publicProcedure
+        .input(z.object({ groupId: z.string(), userId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            const { groupId, userId } = input
+            try {
+                const [paidRows, shareRows, countRow] = await Promise.all([
+                    ctx.db
+                        .select({
+                            currency: expenses.currency,
+                            total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+                        })
+                        .from(expenses)
+                        .where(
+                            and(
+                                eq(expenses.groupId, groupId),
+                                eq(expenses.paidByUserId, userId),
+                                notDeleted
+                            )
+                        )
+                        .groupBy(expenses.currency)
+                        .execute(),
+                    ctx.db
+                        .select({
+                            currency: expenses.currency,
+                            total: sql<string>`COALESCE(SUM(${expenseSplits.amount}), 0)`,
+                        })
+                        .from(expenseSplits)
+                        .innerJoin(expenses, eq(expenseSplits.expenseId, expenses.id))
+                        .where(
+                            and(
+                                eq(expenses.groupId, groupId),
+                                eq(expenseSplits.userId, userId),
+                                notDeleted
+                            )
+                        )
+                        .groupBy(expenses.currency)
+                        .execute(),
+                    ctx.db
+                        .select({ count: sql<string>`COUNT(*)` })
+                        .from(expenses)
+                        .where(
+                            and(
+                                eq(expenses.groupId, groupId),
+                                eq(expenses.paidByUserId, userId),
+                                notDeleted
+                            )
+                        )
+                        .execute(),
+                ])
+
+                const byCurrency = new Map<string, { paid: number; share: number }>()
+                for (const r of paidRows) {
+                    const entry = byCurrency.get(r.currency) ?? { paid: 0, share: 0 }
+                    entry.paid = parseFloat(r.total)
+                    byCurrency.set(r.currency, entry)
+                }
+                for (const r of shareRows) {
+                    const entry = byCurrency.get(r.currency) ?? { paid: 0, share: 0 }
+                    entry.share = parseFloat(r.total)
+                    byCurrency.set(r.currency, entry)
+                }
+
+                return {
+                    paidExpenseCount: parseInt(countRow[0]?.count ?? '0', 10),
+                    byCurrency: Array.from(byCurrency.entries()).map(([currency, v]) => ({
+                        currency,
+                        paid: v.paid,
+                        share: v.share,
+                    })),
+                }
+            } catch (error) {
+                console.error('Error getting user spend:', error)
+                throw new Error('Failed to get user spend')
+            }
+        }),
+
     delete: publicProcedure
         .input(z.object({ expenseId: z.number() }))
         .mutation(async ({ ctx, input }) => {

@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Tabs from '~/app/_components/tabs'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
+import { useGroupIdentity } from '~/app/_components/use-group-identity'
 
 const SummaryTab = () => {
     const router = useRouter()
@@ -28,6 +29,13 @@ const SummaryTab = () => {
         { groupId },
         { enabled: !!groupId }
     )
+
+    const { identity } = useGroupIdentity(groupId)
+    const { data: userSpend } = api.expense.getUserSpend.useQuery(
+        { groupId, userId: identity ?? '' },
+        { enabled: !!groupId && !!identity }
+    )
+    const identityName = usersData?.find((u) => u.id === identity)?.name
 
     const defaultCurrency = totals?.defaultCurrency ?? 'SGD'
 
@@ -141,8 +149,42 @@ const SummaryTab = () => {
                     </div>
                 </div>
 
+                {/* Your spend — only when identity is set */}
+                {identity && userSpend && userSpend.byCurrency.length > 0 && (
+                    <div className="card-dark anim-fade-up d-1" style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <div className="section-title">Your spend</div>
+                            <div className="section-sub">
+                                {identityName ? `Tallied for ${identityName}` : 'Tallied for you'}
+                                {userSpend.paidExpenseCount > 0
+                                    ? ` · ${userSpend.paidExpenseCount} expense${userSpend.paidExpenseCount !== 1 ? 's' : ''} paid`
+                                    : ''}
+                            </div>
+                        </div>
+
+                        {userSpend.byCurrency.map(({ currency, paid, share }) => (
+                            <div key={currency} className="ledger-row">
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.06em', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                                        {currency}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.125rem' }}>
+                                    <span className="font-mono" style={{ fontSize: '0.9375rem', color: 'var(--heading)' }}>
+                                        {formatAmount(paid, currency)}
+                                        <span style={{ color: 'var(--muted)', fontWeight: 400, marginLeft: '0.375rem', fontSize: '0.75rem' }}>paid</span>
+                                    </span>
+                                    <span className="font-mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)' }}>
+                                        {formatAmount(share, currency)} share
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* Member balances */}
-                <div className="card-dark anim-fade-up d-1">
+                <div className="card-dark anim-fade-up d-2">
                     <div style={{ marginBottom: '1.25rem' }}>
                         <div className="section-title">Member Balances</div>
                         <div className="section-sub">Net position after all expenses</div>
