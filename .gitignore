@@ -28,6 +28,8 @@ next-env.d.ts
 /public/swe-worker-*.js.map
 /public/workbox-*.js
 /public/workbox-*.js.map
+/public/fallback-*.js
+/public/fallback-*.js.map
 
 # production
 /build
