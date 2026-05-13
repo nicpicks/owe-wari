@@ -125,10 +125,14 @@ export default function CreateExpense() {
             setIsChecked(init)
             setManualAmounts(initAmounts)
             setLineItemMemberIds(usersData.map((u) => u.id))
-            if (defaultPayee) setPaidByUserId(defaultPayee)
+            setPaidByUserId(defaultPayee ?? usersData[0]?.id ?? '')
         }
         if (usersError) console.error('Error fetching users:', usersError)
     }, [usersData, usersError])
+
+    useEffect(() => {
+        if (defaultPayee) setPaidByUserId(defaultPayee)
+    }, [defaultPayee])
 
     const fileInputRef = useRef<HTMLInputElement>(null)
 
