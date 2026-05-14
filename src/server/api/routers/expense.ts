@@ -281,14 +281,16 @@ export const expenseRouter = createTRPCRouter({
                 notes: z.string().optional(),
                 expenseDate: z.date().optional(),
                 paidByUserId: z.string().optional(),
+                amount: z.number().positive().optional(),
                 actorId: z.string().optional(),
             })
         )
         .mutation(async ({ ctx, input }) => {
-            const { expenseId, actorId, ...rest } = input
-            const patch = Object.fromEntries(
+            const { expenseId, actorId, amount, ...rest } = input
+            const patch: Record<string, unknown> = Object.fromEntries(
                 Object.entries(rest).filter(([, v]) => v !== undefined)
             )
+            if (amount !== undefined) patch.amount = amount.toString()
             if (Object.keys(patch).length === 0) return { success: true }
 
             try {
@@ -303,6 +305,7 @@ export const expenseRouter = createTRPCRouter({
                             notes: expenses.notes,
                             expenseDate: expenses.expenseDate,
                             paidByUserId: expenses.paidByUserId,
+                            amount: expenses.amount,
                         })
                         .from(expenses)
                         .where(eq(expenses.id, expenseId))
@@ -319,7 +322,11 @@ export const expenseRouter = createTRPCRouter({
                     for (const key of Object.keys(patch)) {
                         const next = patch[key]
                         const prev = (current as Record<string, unknown>)[key]
-                        if (next instanceof Date && prev instanceof Date) {
+                        if (key === 'amount') {
+                            if (Math.abs(parseFloat(next as string) - parseFloat(prev as string)) > 0.001) {
+                                changed.push(key)
+                            }
+                        } else if (next instanceof Date && prev instanceof Date) {
                             if (next.getTime() !== prev.getTime()) changed.push(key)
                         } else if (next !== prev) {
                             changed.push(key)
@@ -333,6 +340,25 @@ export const expenseRouter = createTRPCRouter({
                         .set(patch)
                         .where(eq(expenses.id, expenseId))
                         .execute()
+
+                    if (changed.includes('amount') && amount !== undefined) {
+                        const oldAmount = parseFloat(current.amount)
+                        if (oldAmount > 0) {
+                            const ratio = amount / oldAmount
+                            const splits = await trx
+                                .select({ id: expenseSplits.id, amount: expenseSplits.amount })
+                                .from(expenseSplits)
+                                .where(eq(expenseSplits.expenseId, expenseId))
+                                .execute()
+                            for (const split of splits) {
+                                await trx
+                                    .update(expenseSplits)
+                                    .set({ amount: (parseFloat(split.amount) * ratio).toString() })
+                                    .where(eq(expenseSplits.id, split.id))
+                                    .execute()
+                            }
+                        }
+                    }
 
                     await trx.insert(expenseAudits).values({
                         expenseId,
