@@ -49,6 +49,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     const [isEditing, setIsEditing] = useState(false)
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
     const [title, setTitle] = useState('')
+    const [amount, setAmount] = useState(0)
     const [category, setCategory] = useState('General')
     const [notes, setNotes] = useState('')
     const [expenseDate, setExpenseDate] = useState('')
@@ -57,6 +58,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     useEffect(() => {
         if (!expense) return
         setTitle(expense.title)
+        setAmount(parseFloat(expense.amount))
         setCategory(expense.category ?? 'General')
         setNotes(expense.notes ?? '')
         setExpenseDate(toDateInput(expense.expenseDate) ?? '')
@@ -119,6 +121,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
         updateExpense.mutate({
             expenseId: expense.id,
             title,
+            amount: amount > 0 ? amount : undefined,
             category,
             notes,
             expenseDate: new Date(expenseDate),
@@ -130,6 +133,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     const handleCancel = () => {
         if (!expense) return
         setTitle(expense.title)
+        setAmount(parseFloat(expense.amount))
         setCategory(expense.category ?? 'General')
         setNotes(expense.notes ?? '')
         setExpenseDate(toDateInput(expense.expenseDate) ?? '')
@@ -148,11 +152,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
             >
                 {/* Header */}
                 <div className="mb-4 flex items-start justify-between gap-2">
-                    {isConfirmingDelete ? (
-                        <span style={{ color: 'var(--heading)', fontWeight: 600, alignSelf: 'center' }}>
-                            Delete this expense?
-                        </span>
-                    ) : isEditing ? (
+                    {isEditing ? (
                         <input
                             className="field-input"
                             value={title}
@@ -165,25 +165,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                         </h2>
                     )}
                     <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                        {isConfirmingDelete ? (
-                            <>
-                                <button
-                                    onClick={() => setIsConfirmingDelete(false)}
-                                    className="btn-ghost text-sm"
-                                    disabled={deleteExpense.isPending}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => expense && deleteExpense.mutate({ expenseId: expense.id })}
-                                    className="btn-ghost text-sm"
-                                    style={{ color: 'var(--red)' }}
-                                    disabled={deleteExpense.isPending}
-                                >
-                                    {deleteExpense.isPending ? 'Deleting…' : 'Delete'}
-                                </button>
-                            </>
-                        ) : !isEditing && expense ? (
+                        {!isEditing && !isConfirmingDelete && expense && (
                             <>
                                 <button
                                     onClick={() => setIsEditing(true)}
@@ -201,7 +183,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                     Delete
                                 </button>
                             </>
-                        ) : null}
+                        )}
                         <button
                             onClick={onClose}
                             className="btn-ghost text-xl leading-none"
@@ -211,6 +193,58 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                         </button>
                     </div>
                 </div>
+
+                {/* Delete confirmation */}
+                {isConfirmingDelete && (
+                    <div
+                        style={{
+                            background: 'var(--red-dim)',
+                            border: '1px solid rgba(248, 113, 113, 0.25)',
+                            borderRadius: '10px',
+                            padding: '1.25rem',
+                            marginBottom: '1rem',
+                        }}
+                    >
+                        <p style={{ color: 'var(--heading)', fontWeight: 600, marginBottom: '0.375rem' }}>
+                            Delete this expense?
+                        </p>
+                        <p style={{ color: 'var(--dim)', fontSize: '0.875rem', marginBottom: '1.125rem' }}>
+                            This cannot be undone.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.625rem' }}>
+                            <button
+                                className="btn-ghost"
+                                onClick={() => setIsConfirmingDelete(false)}
+                                disabled={deleteExpense.isPending}
+                                style={{ flex: 1, justifyContent: 'center' }}
+                            >
+                                No, keep it
+                            </button>
+                            <button
+                                onClick={() => expense && deleteExpense.mutate({ expenseId: expense.id })}
+                                disabled={deleteExpense.isPending}
+                                style={{
+                                    flex: 1,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'var(--red)',
+                                    color: '#0B0B0B',
+                                    fontWeight: 700,
+                                    fontSize: '0.875rem',
+                                    padding: '0.625rem 1.5rem',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    cursor: deleteExpense.isPending ? 'not-allowed' : 'pointer',
+                                    opacity: deleteExpense.isPending ? 0.5 : 1,
+                                    transition: 'opacity 0.15s',
+                                }}
+                            >
+                                {deleteExpense.isPending ? 'Deleting…' : 'Yes, delete'}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {isLoading && (
                     <p style={{ color: 'var(--muted)' }} className="text-sm">
@@ -226,11 +260,25 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                 Expense Details
                             </p>
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-3">
                                 <span style={{ color: 'var(--muted)' }} className="text-sm">Amount</span>
-                                <span className="font-mono text-lg font-semibold" style={{ color: 'var(--heading)' }}>
-                                    {formatAmount(parseFloat(expense.amount), expense.currency)}
-                                </span>
+                                {isEditing ? (
+                                    <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        className="field-input font-mono no-spinner"
+                                        value={amount || ''}
+                                        onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                                        step="0.01"
+                                        min="0.01"
+                                        required
+                                        style={{ maxWidth: '180px', textAlign: 'right', fontSize: '1rem' }}
+                                    />
+                                ) : (
+                                    <span className="font-mono text-lg font-semibold" style={{ color: 'var(--heading)' }}>
+                                        {formatAmount(parseFloat(expense.amount), expense.currency)}
+                                    </span>
+                                )}
                             </div>
 
                             <div className="flex items-center justify-between gap-3">
