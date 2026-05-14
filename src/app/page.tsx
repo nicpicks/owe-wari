@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { RecentGroupsList } from './groups/recent-groups-list'
+import { ClipboardGroupOpener } from './_components/clipboard-group-opener'
 
 export default function Home() {
     return (
@@ -205,6 +206,7 @@ export default function Home() {
                     </Link>
                 </div>
 
+                <ClipboardGroupOpener />
                 <RecentGroupsList />
 
                 {/* Footer note */}
