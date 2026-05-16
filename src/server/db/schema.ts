@@ -117,6 +117,7 @@ export const expenses = createTable(
     (t) => ({
         groupIdIdx: index('idx_expenses_group_id').on(t.groupId),
         paidByUserIdIdx: index('idx_expenses_paid_by_user_id').on(t.paidByUserId),
+        groupDateIdx: index('idx_expenses_group_date').on(t.groupId, t.deletedAt, t.expenseDate, t.id),
     })
 )
 

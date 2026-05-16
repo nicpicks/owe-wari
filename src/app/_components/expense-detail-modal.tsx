@@ -25,7 +25,8 @@ function formatDate(date: Date) {
 }
 
 function toDateInput(date: Date) {
-    return new Date(date).toISOString().split('T')[0]
+    const d = new Date(date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 interface ExpenseDetailModalProps {
@@ -124,7 +125,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
             amount: amount > 0 ? amount : undefined,
             category,
             notes,
-            expenseDate: new Date(expenseDate),
+            expenseDate: (() => { const [y, m, d] = expenseDate.split('-').map(Number); return new Date(y!, m! - 1, d!) })(),
             paidByUserId,
             actorId: identity ?? undefined,
         })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Tabs from '~/app/_components/tabs'
@@ -34,6 +34,25 @@ const ALL_CHIP_COLOR = '#F2A007'
 const catKey = (e: Expense) => {
     const c = e.category?.trim()
     return c ? c : UNCATEGORIZED
+}
+
+const localDateStr = (date: Date) => {
+    const d = new Date(date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const formatGroupDate = (dateStr: string): string => {
+    const today = localDateStr(new Date())
+    const yesterday = localDateStr(new Date(Date.now() - 86_400_000))
+    if (dateStr === today) return 'Today'
+    if (dateStr === yesterday) return 'Yesterday'
+    const [y, m, d] = dateStr.split('-').map(Number)
+    const date = new Date(y!, m! - 1, d!)
+    return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}),
+    })
 }
 
 const FilterChip = ({
@@ -103,7 +122,7 @@ const ExpensesTab = () => {
         router.push(`/groups/${groupId}/${tab}`)
     }
 
-    const categories = (() => {
+    const categories = useMemo(() => {
         const present = new Set(expenses.map(catKey))
         const known = CATEGORY_ORDER.filter((c) => present.has(c))
         const extras = Array.from(present)
@@ -111,22 +130,26 @@ const ExpensesTab = () => {
             .sort()
         const tail = present.has(UNCATEGORIZED) ? [UNCATEGORIZED] : []
         return [...known, ...extras, ...tail]
-    })()
+    }, [expenses])
 
-    const filteredExpenses =
-        selectedCategory === null
-            ? expenses
-            : expenses.filter((e) => catKey(e) === selectedCategory)
+    const filteredExpenses = useMemo(
+        () => expenses.filter((e) => selectedCategory === null || catKey(e) === selectedCategory),
+        [expenses, selectedCategory]
+    )
 
-    const filteredTotal = (() => {
-        const totals = new Map<string, number>()
+    // Group filtered expenses by local date, preserving newest-first order from the API
+    const groupedExpenses = useMemo(() => {
+        const groups = new Map<string, Expense[]>()
         for (const e of filteredExpenses) {
-            totals.set(e.currency, (totals.get(e.currency) ?? 0) + parseFloat(e.amount))
+            const key = localDateStr(new Date(e.expenseDate))
+            const arr = groups.get(key) ?? []
+            arr.push(e)
+            groups.set(key, arr)
         }
-        return Array.from(totals.entries())
-            .map(([currency, total]) => formatAmount(total, currency))
-            .join(' · ')
-    })()
+        return Array.from(groups.entries())
+    }, [filteredExpenses])
+
+    const totalExpenseCount = filteredExpenses.length
 
     return (
         <div className="page-shell">
@@ -151,7 +174,7 @@ const ExpensesTab = () => {
                                 ? 'No expenses yet'
                                 : selectedCategory === null
                                   ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`
-                                  : `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''} · ${filteredTotal}`}
+                                  : `${totalExpenseCount} expense${totalExpenseCount !== 1 ? 's' : ''} in ${selectedCategory}`}
                         </div>
                     </div>
                     <Link href={`/groups/${groupId}/expenses/create`}>
@@ -179,6 +202,7 @@ const ExpensesTab = () => {
                     </div>
                 ) : (
                     <>
+                        {/* Category filter chips */}
                         {categories.length > 1 && (
                             <div
                                 className="anim-fade-up d-1"
@@ -186,7 +210,7 @@ const ExpensesTab = () => {
                                     display: 'flex',
                                     flexWrap: 'wrap',
                                     gap: '0.5rem',
-                                    marginBottom: '1.25rem',
+                                    marginBottom: '1.5rem',
                                 }}
                             >
                                 <FilterChip
@@ -217,90 +241,135 @@ const ExpensesTab = () => {
                                 style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}
                             >
                                 <p style={{ color: 'var(--dim)', fontSize: '0.9375rem' }}>
-                                    No expenses in this category.
+                                    No {selectedCategory?.toLowerCase()} expenses recorded yet.
                                 </p>
                             </div>
                         ) : (
-                            <div className="card-dark anim-fade-up d-2" style={{ padding: 0, overflow: 'hidden' }}>
-                                {filteredExpenses.map((expense, i) => {
-                                    const catColor = CATEGORY_COLORS[expense.category ?? ''] ?? '#717171'
+                            <div className="anim-fade-up d-2">
+                                {groupedExpenses.map(([dateStr, dayExpenses]) => {
+                                    // Compute daily total per currency
+                                    const dayTotals = new Map<string, number>()
+                                    for (const e of dayExpenses) {
+                                        dayTotals.set(e.currency, (dayTotals.get(e.currency) ?? 0) + parseFloat(e.amount))
+                                    }
+                                    const dayTotalStr = Array.from(dayTotals.entries())
+                                        .map(([currency, total]) => formatAmount(total, currency))
+                                        .join(' · ')
+
                                     return (
-                                        <div
-                                            key={expense.id}
-                                            onClick={() => setSelectedExpenseId(expense.id)}
-                                            className="cursor-pointer transition-colors hover:bg-white/5"
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                padding: '1rem 1.5rem',
-                                                borderBottom:
-                                                    i < filteredExpenses.length - 1
-                                                        ? '1px solid var(--border)'
-                                                        : 'none',
-                                                gap: '1rem',
-                                            }}
-                                        >
-                                            {/* Category dot + info */}
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', flex: 1, minWidth: 0 }}>
-                                                <div
-                                                    style={{
-                                                        width: '36px',
-                                                        height: '36px',
-                                                        borderRadius: '8px',
-                                                        background: `${catColor}18`,
-                                                        border: `1px solid ${catColor}30`,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        flexShrink: 0,
-                                                    }}
-                                                >
-                                                    <div
-                                                        style={{
-                                                            width: '7px',
-                                                            height: '7px',
-                                                            borderRadius: '50%',
-                                                            background: catColor,
-                                                        }}
-                                                    />
-                                                </div>
-                                                <div style={{ minWidth: 0 }}>
-                                                    <div
-                                                        style={{
-                                                            color: 'var(--heading)',
-                                                            fontWeight: 500,
-                                                            fontSize: '0.9375rem',
-                                                            whiteSpace: 'nowrap',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                        }}
-                                                    >
-                                                        {expense.title}
-                                                    </div>
-                                                    <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: '0.125rem' }}>
-                                                        {expense.expenseDate instanceof Date
-                                                            ? expense.expenseDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                                                            : new Date(expense.expenseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                                                        {expense.category && (
-                                                            <span style={{ marginLeft: '0.5rem', color: catColor }}>
-                                                                {expense.category}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* Amount */}
+                                        <div key={dateStr} style={{ marginBottom: '1.5rem' }}>
+                                            {/* Day header */}
                                             <div
-                                                className="font-mono"
                                                 style={{
-                                                    fontWeight: 600,
-                                                    fontSize: '0.9375rem',
-                                                    color: 'var(--heading)',
-                                                    flexShrink: 0,
+                                                    display: 'flex',
+                                                    alignItems: 'baseline',
+                                                    justifyContent: 'space-between',
+                                                    marginBottom: '0.5rem',
+                                                    padding: '0 0.25rem',
                                                 }}
                                             >
-                                                {formatAmount(parseFloat(expense.amount), expense.currency)}
+                                                <span
+                                                    style={{
+                                                        fontSize: '0.6875rem',
+                                                        fontWeight: 700,
+                                                        letterSpacing: '0.08em',
+                                                        textTransform: 'uppercase',
+                                                        color: 'var(--dim)',
+                                                    }}
+                                                >
+                                                    {formatGroupDate(dateStr)}
+                                                </span>
+                                                <span
+                                                    className="font-mono"
+                                                    style={{
+                                                        fontSize: '0.75rem',
+                                                        color: 'var(--muted)',
+                                                    }}
+                                                >
+                                                    {dayTotalStr}
+                                                </span>
+                                            </div>
+
+                                            {/* Expenses for this day */}
+                                            <div className="card-dark" style={{ padding: 0, overflow: 'hidden' }}>
+                                                {dayExpenses.map((expense, i) => {
+                                                    const catColor = CATEGORY_COLORS[expense.category ?? ''] ?? '#717171'
+                                                    return (
+                                                        <div
+                                                            key={expense.id}
+                                                            onClick={() => setSelectedExpenseId(expense.id)}
+                                                            className="cursor-pointer transition-colors hover:bg-white/5"
+                                                            style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                padding: '0.875rem 1.25rem',
+                                                                borderBottom:
+                                                                    i < dayExpenses.length - 1
+                                                                        ? '1px solid var(--border)'
+                                                                        : 'none',
+                                                                gap: '1rem',
+                                                            }}
+                                                        >
+                                                            {/* Category dot + info */}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                                                                <div
+                                                                    style={{
+                                                                        width: '32px',
+                                                                        height: '32px',
+                                                                        borderRadius: '8px',
+                                                                        background: `${catColor}18`,
+                                                                        border: `1px solid ${catColor}30`,
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        flexShrink: 0,
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            width: '6px',
+                                                                            height: '6px',
+                                                                            borderRadius: '50%',
+                                                                            background: catColor,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <div style={{ minWidth: 0 }}>
+                                                                    <div
+                                                                        style={{
+                                                                            color: 'var(--heading)',
+                                                                            fontWeight: 500,
+                                                                            fontSize: '0.9375rem',
+                                                                            whiteSpace: 'nowrap',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                        }}
+                                                                    >
+                                                                        {expense.title}
+                                                                    </div>
+                                                                    {expense.category && (
+                                                                        <div style={{ fontSize: '0.6875rem', color: catColor, marginTop: '0.125rem', fontWeight: 500 }}>
+                                                                            {expense.category}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {/* Amount */}
+                                                            <div
+                                                                className="font-mono"
+                                                                style={{
+                                                                    fontWeight: 600,
+                                                                    fontSize: '0.9375rem',
+                                                                    color: 'var(--heading)',
+                                                                    flexShrink: 0,
+                                                                }}
+                                                            >
+                                                                {formatAmount(parseFloat(expense.amount), expense.currency)}
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )
