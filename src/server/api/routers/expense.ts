@@ -134,9 +134,13 @@ export const expenseRouter = createTRPCRouter({
                         category: expenses.category,
                         notes: expenses.notes,
                         expenseDate: expenses.expenseDate,
+                        paidByUserId: expenses.paidByUserId,
+                        participantIds: sql<string[]>`coalesce(array_agg(${expenseSplits.userId}) filter (where ${expenseSplits.userId} is not null), '{}')`,
                     })
                     .from(expenses)
+                    .leftJoin(expenseSplits, eq(expenseSplits.expenseId, expenses.id))
                     .where(and(eq(expenses.groupId, input.groupId), notDeleted))
+                    .groupBy(expenses.id)
                     .orderBy(desc(expenses.expenseDate), desc(expenses.id))
                     .execute()
 
