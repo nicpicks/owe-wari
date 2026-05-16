@@ -7,6 +7,7 @@ import Tabs from '~/app/_components/tabs'
 import { ExpenseDetailModal } from '~/app/_components/expense-detail-modal'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
+import { useGroupIdentity } from '~/app/_components/use-group-identity'
 
 interface Expense {
     id: number
@@ -16,6 +17,8 @@ interface Expense {
     category: string | null
     notes: string | null
     expenseDate: Date
+    paidByUserId: string
+    participantIds: string[]
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -107,6 +110,8 @@ const ExpensesTab = () => {
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null)
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+    const [viewMode, setViewMode] = useState<'all' | 'me'>('all')
+    const { identity, isLoaded: identityLoaded } = useGroupIdentity(groupId)
 
     const { data: expensesData, error: expensesError } = api.expense.getExpenses.useQuery(
         { groupId: groupId ?? '' },
@@ -132,10 +137,18 @@ const ExpensesTab = () => {
         return [...known, ...extras, ...tail]
     }, [expenses])
 
-    const filteredExpenses = useMemo(
-        () => expenses.filter((e) => selectedCategory === null || catKey(e) === selectedCategory),
-        [expenses, selectedCategory]
-    )
+    const filteredExpenses = useMemo(() => {
+        let result = expenses
+        if (selectedCategory !== null) {
+            result = result.filter((e) => catKey(e) === selectedCategory)
+        }
+        if (viewMode === 'me' && identity) {
+            result = result.filter(
+                (e) => e.paidByUserId === identity || e.participantIds.includes(identity)
+            )
+        }
+        return result
+    }, [expenses, selectedCategory, viewMode, identity])
 
     // Group filtered expenses by local date, preserving newest-first order from the API
     const groupedExpenses = useMemo(() => {
@@ -172,19 +185,53 @@ const ExpensesTab = () => {
                         <div className="section-sub">
                             {expenses.length === 0
                                 ? 'No expenses yet'
-                                : selectedCategory === null
+                                : selectedCategory === null && viewMode === 'all'
                                   ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`
-                                  : `${totalExpenseCount} expense${totalExpenseCount !== 1 ? 's' : ''} in ${selectedCategory}`}
+                                  : `${totalExpenseCount} expense${totalExpenseCount !== 1 ? 's' : ''}${selectedCategory ? ` in ${selectedCategory}` : ''}`}
                         </div>
                     </div>
-                    <Link href={`/groups/${groupId}/expenses/create`}>
-                        <button className="btn-amber" style={{ flexShrink: 0 }}>
-                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                                <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-                            </svg>
-                            Add
-                        </button>
-                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                        {/* All | Me toggle — only shown once identity is resolved and set */}
+                        {identityLoaded && identity && (
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    border: '1px solid var(--border-2)',
+                                    borderRadius: '6px',
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {(['all', 'me'] as const).map((mode) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => setViewMode(mode)}
+                                        style={{
+                                            padding: '0.3125rem 0.75rem',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontFamily: 'var(--font-jakarta), sans-serif',
+                                            background: viewMode === mode ? 'var(--amber)' : 'none',
+                                            color: viewMode === mode ? '#0B0B0B' : 'var(--dim)',
+                                            transition: 'background 0.15s, color 0.15s',
+                                        }}
+                                    >
+                                        {mode === 'all' ? 'All' : 'Me'}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <Link href={`/groups/${groupId}/expenses/create`}>
+                            <button className="btn-amber">
+                                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                    <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+                                </svg>
+                                Add
+                            </button>
+                        </Link>
+                    </div>
                 </div>
 
                 {expenses.length === 0 ? (
@@ -241,7 +288,9 @@ const ExpensesTab = () => {
                                 style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}
                             >
                                 <p style={{ color: 'var(--dim)', fontSize: '0.9375rem' }}>
-                                    No {selectedCategory?.toLowerCase()} expenses recorded yet.
+                                    {viewMode === 'me'
+                                        ? "You're not involved in any expenses yet."
+                                        : `No ${selectedCategory?.toLowerCase() ?? ''} expenses recorded yet.`}
                                 </p>
                             </div>
                         ) : (
