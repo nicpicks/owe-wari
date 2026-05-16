@@ -80,6 +80,7 @@ export default function CreateExpense() {
     const router = useRouter()
     const pathname = usePathname()
     const groupId = pathname.split('/')[2]?.toString()
+    const utils = api.useUtils()
 
     const [title, setTitle] = useState('')
     const [amount, setAmount] = useState(0)
@@ -256,7 +257,14 @@ export default function CreateExpense() {
     const allItemsHaveParticipants = lineItems.every((item) => item.participantIds.length > 0)
 
     const createExpense = api.expense.create.useMutation({
-        onSuccess: (data) => router.push(`/groups/${data.id}/expenses`),
+        onSuccess: async (data) => {
+            await Promise.all([
+                utils.expense.getExpenses.invalidate({ groupId: data.id }),
+                utils.expense.getTotalExpenseCost.invalidate({ groupId: data.id }),
+                utils.expense.getBalances.invalidate({ groupId: data.id }),
+            ])
+            router.push(`/groups/${data.id}/expenses`)
+        },
         onError: (error) => {
             console.error('Error creating expense:', error)
             alert(error.message || 'Failed to create expense')
