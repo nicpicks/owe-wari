@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Tabs from '~/app/_components/tabs'
@@ -114,7 +114,7 @@ const ExpensesTab = () => {
         router.push(`/groups/${groupId}/${tab}`)
     }
 
-    const categories = (() => {
+    const categories = useMemo(() => {
         const present = new Set(expenses.map(catKey))
         const known = CATEGORY_ORDER.filter((c) => present.has(c))
         const extras = Array.from(present)
@@ -122,15 +122,22 @@ const ExpensesTab = () => {
             .sort()
         const tail = present.has(UNCATEGORIZED) ? [UNCATEGORIZED] : []
         return [...known, ...extras, ...tail]
-    })()
+    }, [expenses])
 
-    const uniqueDates = [...new Set(expenses.map((e) => localDateStr(new Date(e.expenseDate))))]
+    const uniqueDates = useMemo(
+        () => [...new Set(expenses.map((e) => localDateStr(new Date(e.expenseDate))))],
+        [expenses]
+    )
 
-    const filteredExpenses = expenses
-        .filter((e) => selectedCategory === null || catKey(e) === selectedCategory)
-        .filter((e) => selectedDate === null || localDateStr(new Date(e.expenseDate)) === selectedDate)
+    const filteredExpenses = useMemo(
+        () =>
+            expenses
+                .filter((e) => selectedCategory === null || catKey(e) === selectedCategory)
+                .filter((e) => selectedDate === null || localDateStr(new Date(e.expenseDate)) === selectedDate),
+        [expenses, selectedCategory, selectedDate]
+    )
 
-    const filteredTotal = (() => {
+    const filteredTotal = useMemo(() => {
         const totals = new Map<string, number>()
         for (const e of filteredExpenses) {
             totals.set(e.currency, (totals.get(e.currency) ?? 0) + parseFloat(e.amount))
@@ -138,7 +145,7 @@ const ExpensesTab = () => {
         return Array.from(totals.entries())
             .map(([currency, total]) => formatAmount(total, currency))
             .join(' · ')
-    })()
+    }, [filteredExpenses])
 
     return (
         <div className="page-shell">
