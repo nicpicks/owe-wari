@@ -441,8 +441,11 @@ export default function CreateExpense() {
                                 <input
                                     className="field-input"
                                     type="date"
-                                    value={expenseDate.toISOString().split('T')[0]}
-                                    onChange={(e) => setExpenseDate(new Date(e.target.value))}
+                                    value={`${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}-${String(expenseDate.getDate()).padStart(2, '0')}`}
+                                    onChange={(e) => {
+                                        const [y, m, d] = e.target.value.split('-').map(Number)
+                                        setExpenseDate(new Date(y!, m! - 1, d!))
+                                    }}
                                 />
                             </div>
 

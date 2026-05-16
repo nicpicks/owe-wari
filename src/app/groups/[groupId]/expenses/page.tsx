@@ -36,6 +36,16 @@ const catKey = (e: Expense) => {
     return c ? c : UNCATEGORIZED
 }
 
+const localDateStr = (date: Date) => {
+    const d = new Date(date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const formatDateChip = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y!, m! - 1, d!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
 const FilterChip = ({
     label,
     color,
@@ -88,6 +98,7 @@ const ExpensesTab = () => {
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null)
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+    const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
     const { data: expensesData, error: expensesError } = api.expense.getExpenses.useQuery(
         { groupId: groupId ?? '' },
@@ -113,10 +124,11 @@ const ExpensesTab = () => {
         return [...known, ...extras, ...tail]
     })()
 
-    const filteredExpenses =
-        selectedCategory === null
-            ? expenses
-            : expenses.filter((e) => catKey(e) === selectedCategory)
+    const uniqueDates = [...new Set(expenses.map((e) => localDateStr(new Date(e.expenseDate))))]
+
+    const filteredExpenses = expenses
+        .filter((e) => selectedCategory === null || catKey(e) === selectedCategory)
+        .filter((e) => selectedDate === null || localDateStr(new Date(e.expenseDate)) === selectedDate)
 
     const filteredTotal = (() => {
         const totals = new Map<string, number>()
@@ -149,7 +161,7 @@ const ExpensesTab = () => {
                         <div className="section-sub">
                             {expenses.length === 0
                                 ? 'No expenses yet'
-                                : selectedCategory === null
+                                : selectedCategory === null && selectedDate === null
                                   ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`
                                   : `${filteredExpenses.length} expense${filteredExpenses.length !== 1 ? 's' : ''} · ${filteredTotal}`}
                         </div>
@@ -186,7 +198,7 @@ const ExpensesTab = () => {
                                     display: 'flex',
                                     flexWrap: 'wrap',
                                     gap: '0.5rem',
-                                    marginBottom: '1.25rem',
+                                    marginBottom: '0.75rem',
                                 }}
                             >
                                 <FilterChip
@@ -211,13 +223,45 @@ const ExpensesTab = () => {
                             </div>
                         )}
 
+                        {uniqueDates.length > 1 && (
+                            <div
+                                className="anim-fade-up d-1"
+                                style={{
+                                    display: 'flex',
+                                    gap: '0.5rem',
+                                    overflowX: 'auto',
+                                    paddingBottom: '0.25rem',
+                                    marginBottom: '1rem',
+                                    scrollbarWidth: 'none',
+                                }}
+                            >
+                                <FilterChip
+                                    label="All dates"
+                                    color={ALL_CHIP_COLOR}
+                                    count={expenses.length}
+                                    active={selectedDate === null}
+                                    onClick={() => setSelectedDate(null)}
+                                />
+                                {uniqueDates.map((dateStr) => (
+                                    <FilterChip
+                                        key={dateStr}
+                                        label={formatDateChip(dateStr)}
+                                        color="#94A3B8"
+                                        count={expenses.filter((e) => localDateStr(new Date(e.expenseDate)) === dateStr).length}
+                                        active={selectedDate === dateStr}
+                                        onClick={() => setSelectedDate(selectedDate === dateStr ? null : dateStr)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
                         {filteredExpenses.length === 0 ? (
                             <div
                                 className="card-dark anim-fade-up d-2"
                                 style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}
                             >
                                 <p style={{ color: 'var(--dim)', fontSize: '0.9375rem' }}>
-                                    No expenses in this category.
+                                    No expenses match the selected filters.
                                 </p>
                             </div>
                         ) : (

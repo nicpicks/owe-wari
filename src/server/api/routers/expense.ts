@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq, sql, and, isNull, isNotNull } from 'drizzle-orm'
+import { eq, sql, and, isNull, isNotNull, desc } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
@@ -137,6 +137,7 @@ export const expenseRouter = createTRPCRouter({
                     })
                     .from(expenses)
                     .where(and(eq(expenses.groupId, input.groupId), notDeleted))
+                    .orderBy(desc(expenses.expenseDate), desc(expenses.id))
                     .execute()
 
                 return expensesInGroup
