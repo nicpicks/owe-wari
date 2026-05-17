@@ -24,13 +24,14 @@ interface Expense {
 const CATEGORY_COLORS: Record<string, string> = {
     Food: '#F59E0B',
     Transport: '#6366F1',
-    Accommodation: '#06B6D4',
+    Stay: '#06B6D4',
     Groceries: '#10B981',
     General: '#717171',
+    Activities: '#EC4899',
     Others: '#8B5CF6',
 }
 
-const CATEGORY_ORDER = ['Food', 'Transport', 'Accommodation', 'Groceries', 'General', 'Others']
+const CATEGORY_ORDER = ['Food', 'Transport', 'Stay', 'Groceries', 'Activities', 'General', 'Others']
 const UNCATEGORIZED = 'Uncategorized'
 const ALL_CHIP_COLOR = '#F2A007'
 

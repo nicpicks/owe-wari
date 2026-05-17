@@ -5,14 +5,15 @@ import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
 import { useGroupIdentity } from './use-group-identity'
 
-const CATEGORIES = ['General', 'Food', 'Transport', 'Accommodation', 'Groceries', 'Others'] as const
+const CATEGORIES = ['General', 'Food', 'Transport', 'Stay', 'Groceries', 'Activities', 'Others'] as const
 
 const CATEGORY_COLORS: Record<string, string> = {
     Food: '#F59E0B',
     Transport: '#6366F1',
-    Accommodation: '#06B6D4',
+    Stay: '#06B6D4',
     Groceries: '#10B981',
     General: '#717181',
+    Activities: '#EC4899',
     Others: '#8B5CF6',
 }
 

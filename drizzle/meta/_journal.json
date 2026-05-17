@@ -57,6 +57,13 @@
       "when": 1747612800000,
       "tag": "0008_expense_group_date_index",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1747699200000,
+      "tag": "0009_rename_accommodation_category",
+      "breakpoints": true
     }
   ]
 }
