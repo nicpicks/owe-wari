@@ -464,7 +464,7 @@ export default function CreateExpense() {
                                     value={category}
                                     onChange={(e) => setCategory(e.target.value)}
                                 >
-                                    {['General', 'Food', 'Transport', 'Accommodation', 'Groceries', 'Others'].map((c) => (
+                                    {['General', 'Food', 'Transport', 'Stay', 'Groceries', 'Activities', 'Others'].map((c) => (
                                         <option key={c} value={c}>{c}</option>
                                     ))}
                                 </select>
