@@ -76,6 +76,56 @@ const SPLIT_MODES: SplitModeConfig[] = [
     },
 ]
 
+function evalExpr(expr: string): number | null {
+    const s = expr.replace(/\s+/g, '')
+    if (!s) return null
+    let pos = 0
+
+    function parseExpr(): number {
+        let left = parseTerm()
+        while (pos < s.length && (s[pos] === '+' || s[pos] === '-')) {
+            const op = s[pos++]!
+            const right = parseTerm()
+            left = op === '+' ? left + right : left - right
+        }
+        return left
+    }
+
+    function parseTerm(): number {
+        let left = parseFactor()
+        while (pos < s.length && (s[pos] === '*' || s[pos] === '/')) {
+            const op = s[pos++]!
+            const right = parseFactor()
+            if (op === '/' && right === 0) throw new Error('div by zero')
+            left = op === '*' ? left * right : left / right
+        }
+        return left
+    }
+
+    function parseFactor(): number {
+        if (s[pos] === '(') {
+            pos++
+            const val = parseExpr()
+            if (s[pos] === ')') pos++
+            return val
+        }
+        const start = pos
+        if (s[pos] === '-' || s[pos] === '+') pos++
+        while (pos < s.length && (s[pos] === '.' || (s[pos]! >= '0' && s[pos]! <= '9'))) pos++
+        const num = parseFloat(s.slice(start, pos))
+        if (isNaN(num)) throw new Error('invalid')
+        return num
+    }
+
+    try {
+        const result = parseExpr()
+        if (pos !== s.length) return null
+        return isFinite(result) ? result : null
+    } catch {
+        return null
+    }
+}
+
 export default function CreateExpense() {
     const router = useRouter()
     const pathname = usePathname()
@@ -84,6 +134,7 @@ export default function CreateExpense() {
 
     const [title, setTitle] = useState('')
     const [amount, setAmount] = useState(0)
+    const [rawAmount, setRawAmount] = useState('')
     const [expenseDate, setExpenseDate] = useState(new Date())
     const [category, setCategory] = useState('General')
     const [paidByUserId, setPaidByUserId] = useState('')
@@ -156,6 +207,7 @@ export default function CreateExpense() {
         onSuccess: (data) => {
             if (data.total !== null) {
                 setAmount(data.total)
+                setRawAmount(String(data.total))
             } else {
                 alert('Could not detect a total on this receipt. Please enter the amount manually.')
             }
@@ -301,6 +353,9 @@ export default function CreateExpense() {
     const manualTotal = Object.values(manualAmounts).reduce((s, v) => s + v, 0)
     const manualRemaining = amount - manualTotal
 
+    const hasOp = /[+*/]/.test(rawAmount) || rawAmount.slice(1).includes('-')
+    const exprPreview = hasOp ? evalExpr(rawAmount) : null
+
     const allNames = users.map((u) => u.name)
     const submitDisabled = createExpense.isPending
         || (hasLineItems ? !allItemsHaveParticipants : !splitValid)
@@ -377,7 +432,7 @@ export default function CreateExpense() {
                             marginBottom: '1.375rem',
                             borderBottom: '1px solid var(--border)',
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                                 <select
                                     value={currency}
                                     onChange={(e) => setCurrency(e.target.value)}
@@ -405,14 +460,36 @@ export default function CreateExpense() {
                                     ))}
                                 </select>
                                 <input
-                                    type="number"
+                                    type="text"
                                     inputMode="decimal"
                                     className="no-spinner"
                                     placeholder="0.00"
-                                    step="0.01"
-                                    min="0"
-                                    value={amount || ''}
-                                    onChange={(e) => setAmount(Number(e.target.value))}
+                                    value={rawAmount}
+                                    onChange={(e) => {
+                                        const raw = e.target.value
+                                        setRawAmount(raw)
+                                        const result = evalExpr(raw)
+                                        setAmount(result !== null && result >= 0 ? result : parseFloat(raw) || 0)
+                                    }}
+                                    onBlur={() => {
+                                        const result = evalExpr(rawAmount)
+                                        if (result !== null && result >= 0) {
+                                            const fmt = result % 1 === 0 ? String(result) : result.toFixed(2)
+                                            setRawAmount(fmt)
+                                            setAmount(result)
+                                        }
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            const result = evalExpr(rawAmount)
+                                            if (result !== null && result >= 0) {
+                                                const fmt = result % 1 === 0 ? String(result) : result.toFixed(2)
+                                                setRawAmount(fmt)
+                                                setAmount(result)
+                                            }
+                                        }
+                                    }}
                                     required
                                     style={{
                                         background: 'none',
@@ -423,12 +500,24 @@ export default function CreateExpense() {
                                         fontFamily: 'var(--font-mono), monospace',
                                         color: amount > 0 ? 'var(--heading)' : 'var(--muted)',
                                         textAlign: 'center',
-                                        width: '8ch',
+                                        minWidth: '8ch',
+                                        width: `${Math.max(8, rawAmount.length + 1)}ch`,
                                         padding: 0,
                                         lineHeight: 1.15,
                                     }}
                                 />
                             </div>
+                            {exprPreview !== null && (
+                                <div style={{
+                                    fontSize: '0.875rem',
+                                    color: 'var(--muted)',
+                                    fontFamily: 'var(--font-mono), monospace',
+                                    marginTop: '0.375rem',
+                                    textAlign: 'center',
+                                }}>
+                                    = {exprPreview.toFixed(2)}
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem' }}>
