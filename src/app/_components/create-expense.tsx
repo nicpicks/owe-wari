@@ -507,6 +507,40 @@ export default function CreateExpense() {
                                     }}
                                 />
                             </div>
+                            <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'center', marginTop: '0.625rem' }}>
+                                {(['+', '−', '×', '÷'] as const).map((label) => {
+                                    const char = label === '−' ? '-' : label === '×' ? '*' : label === '÷' ? '/' : '+'
+                                    return (
+                                        <button
+                                            key={label}
+                                            type="button"
+                                            onClick={() => {
+                                                const newRaw = rawAmount + char
+                                                setRawAmount(newRaw)
+                                                const result = evalExpr(newRaw)
+                                                if (result !== null && result >= 0) setAmount(result)
+                                            }}
+                                            style={{
+                                                background: 'var(--surface-3)',
+                                                border: '1px solid var(--border-2)',
+                                                borderRadius: '6px',
+                                                color: 'var(--dim)',
+                                                fontFamily: 'var(--font-mono), monospace',
+                                                fontSize: '1rem',
+                                                width: '2.25rem',
+                                                height: '2.25rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            {label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
                             {exprPreview !== null && (
                                 <div style={{
                                     fontSize: '0.875rem',
