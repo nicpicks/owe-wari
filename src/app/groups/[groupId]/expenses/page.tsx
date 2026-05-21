@@ -112,6 +112,7 @@ const ExpensesTab = () => {
     const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null)
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
     const [viewMode, setViewMode] = useState<'all' | 'me'>('all')
+    const [searchQuery, setSearchQuery] = useState('')
     const { identity, isLoaded: identityLoaded } = useGroupIdentity(groupId)
 
     const { data: expensesData, error: expensesError } = api.expense.getExpenses.useQuery(
@@ -148,8 +149,12 @@ const ExpensesTab = () => {
                 (e) => e.paidByUserId === identity || e.participantIds.includes(identity)
             )
         }
+        if (searchQuery.trim()) {
+            const q = searchQuery.trim().toLowerCase()
+            result = result.filter((e) => e.title.toLowerCase().includes(q))
+        }
         return result
-    }, [expenses, selectedCategory, viewMode, identity])
+    }, [expenses, selectedCategory, viewMode, identity, searchQuery])
 
     // Group filtered expenses by local date, preserving newest-first order from the API
     const groupedExpenses = useMemo(() => {
@@ -186,9 +191,15 @@ const ExpensesTab = () => {
                         <div className="section-sub">
                             {expenses.length === 0
                                 ? 'No expenses yet'
-                                : selectedCategory === null && viewMode === 'all'
-                                  ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`
-                                  : `${totalExpenseCount} expense${totalExpenseCount !== 1 ? 's' : ''}${selectedCategory ? ` in ${selectedCategory}` : ''}`}
+                                : (() => {
+                                    const base =
+                                        selectedCategory === null && viewMode === 'all'
+                                            ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`
+                                            : `${totalExpenseCount} expense${totalExpenseCount !== 1 ? 's' : ''}${selectedCategory ? ` in ${selectedCategory}` : ''}`
+                                    return searchQuery.trim()
+                                        ? `${base} matching "${searchQuery.trim()}"`
+                                        : base
+                                })()}
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
@@ -234,6 +245,35 @@ const ExpensesTab = () => {
                         </Link>
                     </div>
                 </div>
+
+                {expenses.length > 0 && (
+                    <div style={{ position: 'relative', marginBottom: '1rem' }} className="anim-fade-up d-1">
+                        <svg
+                            width="14" height="14" viewBox="0 0 14 14" fill="none"
+                            style={{ position: 'absolute', left: '0.625rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                        >
+                            <circle cx="6" cy="6" r="4.5" stroke="var(--muted)" strokeWidth="1.5"/>
+                            <path d="M9.5 9.5L12.5 12.5" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search expenses…"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem 0.5rem 2.25rem',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-2)',
+                                background: 'var(--surface-2)',
+                                color: 'var(--heading)',
+                                fontSize: '0.875rem',
+                                outline: 'none',
+                                fontFamily: 'var(--font-jakarta), sans-serif',
+                            }}
+                        />
+                    </div>
+                )}
 
                 {expenses.length === 0 ? (
                     <div
@@ -289,9 +329,11 @@ const ExpensesTab = () => {
                                 style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}
                             >
                                 <p style={{ color: 'var(--dim)', fontSize: '0.9375rem' }}>
-                                    {viewMode === 'me'
-                                        ? "You're not involved in any expenses yet."
-                                        : `No ${selectedCategory?.toLowerCase() ?? ''} expenses recorded yet.`}
+                                    {searchQuery.trim()
+                                        ? `No expenses matching "${searchQuery.trim()}".`
+                                        : viewMode === 'me'
+                                          ? "You're not involved in any expenses yet."
+                                          : `No ${selectedCategory?.toLowerCase() ?? ''} expenses recorded yet.`}
                                 </p>
                             </div>
                         ) : (

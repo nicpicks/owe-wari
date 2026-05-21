@@ -19,6 +19,7 @@ const Tabs = ({
     const tabs = [
         { key: 'summary',  label: 'Summary' },
         { key: 'expenses', label: 'Expenses' },
+        { key: 'totals',   label: 'Totals' },
         { key: 'balances', label: 'Balances' },
         { key: 'history',  label: 'History' },
         { key: 'settings', label: 'Settings' },
