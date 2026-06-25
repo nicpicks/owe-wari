@@ -405,6 +405,38 @@ export const expenseRouter = createTRPCRouter({
                                     .where(eq(expenseSplits.id, split.id))
                                     .execute()
                             }
+                            // Scale payments by the same ratio so the paid side stays
+                            // consistent with the new total (handles single- and multi-payer).
+                            const payments = await trx
+                                .select({ id: expensePayments.id, amount: expensePayments.amount })
+                                .from(expensePayments)
+                                .where(eq(expensePayments.expenseId, expenseId))
+                                .execute()
+                            for (const payment of payments) {
+                                await trx
+                                    .update(expensePayments)
+                                    .set({ amount: (parseFloat(payment.amount) * ratio).toString() })
+                                    .where(eq(expensePayments.id, payment.id))
+                                    .execute()
+                            }
+                        }
+                    }
+
+                    // When "Paid by" is changed on a single-payer expense, repoint its
+                    // lone payment row so the credited payer matches. Multi-payer expenses
+                    // keep their explicit payment breakdown (paidByUserId is just the label).
+                    if (changed.includes('paidByUserId') && input.paidByUserId !== undefined) {
+                        const payments = await trx
+                            .select({ id: expensePayments.id })
+                            .from(expensePayments)
+                            .where(eq(expensePayments.expenseId, expenseId))
+                            .execute()
+                        if (payments.length === 1 && payments[0]) {
+                            await trx
+                                .update(expensePayments)
+                                .set({ userId: input.paidByUserId })
+                                .where(eq(expensePayments.id, payments[0].id))
+                                .execute()
                         }
                     }
 
