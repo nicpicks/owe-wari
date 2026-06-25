@@ -143,6 +143,8 @@ export default function CreateExpense() {
     const [isChecked, setIsChecked] = useState<Record<string, boolean>>({})
     const [splitMode, setSplitMode] = useState<SplitMode>('even')
     const [manualAmounts, setManualAmounts] = useState<Record<string, number>>({})
+    const [payMode, setPayMode] = useState<'single' | 'multiple'>('single')
+    const [payAmounts, setPayAmounts] = useState<Record<string, number>>({})
     const [lineItems, setLineItems] = useState<LineItem[]>([])
     const [scannedLineItems, setScannedLineItems] = useState<LineItem[]>([])
     const [lineItemMemberIds, setLineItemMemberIds] = useState<string[]>([])
@@ -179,6 +181,7 @@ export default function CreateExpense() {
             usersData.forEach((u) => { init[u.id] = true; initAmounts[u.id] = 0 })
             setIsChecked(init)
             setManualAmounts(initAmounts)
+            setPayAmounts(initAmounts)
             setLineItemMemberIds(usersData.map((u) => u.id))
             const userIds = new Set(usersData.map((u) => u.id))
             const preferred =
@@ -325,6 +328,9 @@ export default function CreateExpense() {
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
+        const multiPay = payMode === 'multiple'
+            ? Object.entries(payAmounts).filter(([, v]) => v > 0).map(([userId, amt]) => ({ userId, amount: amt }))
+            : undefined
         if (hasLineItems) {
             const splitAmounts = Object.entries(lineItemTotals)
                 .filter(([, v]) => v > 0)
@@ -333,6 +339,7 @@ export default function CreateExpense() {
                 title, groupId: groupId ?? '', paidByUserId,
                 createdByUserId: identity ?? undefined,
                 amount, currency, category, notes, expenseDate, splitAmounts,
+                payAmounts: multiPay,
             })
         } else {
             const payload = activeModeConfig.toPayload(splitCtx)
@@ -340,6 +347,7 @@ export default function CreateExpense() {
                 title, groupId: groupId ?? '', paidByUserId,
                 createdByUserId: identity ?? undefined,
                 amount, currency, category, notes, expenseDate, ...payload,
+                payAmounts: multiPay,
             })
         }
     }
@@ -353,11 +361,16 @@ export default function CreateExpense() {
     const manualTotal = Object.values(manualAmounts).reduce((s, v) => s + v, 0)
     const manualRemaining = amount - manualTotal
 
+    const payTotal = Object.values(payAmounts).reduce((s, v) => s + v, 0)
+    const payRemaining = amount - payTotal
+    const payValid = payMode === 'single' || (amount > 0 && Math.abs(payRemaining) < 0.01 && Object.values(payAmounts).some((v) => v > 0))
+
     const hasOp = /[+*/]/.test(rawAmount) || rawAmount.slice(1).includes('-')
     const exprPreview = hasOp ? evalExpr(rawAmount) : null
 
     const allNames = users.map((u) => u.name)
     const submitDisabled = createExpense.isPending
+        || !payValid
         || (hasLineItems ? !allItemsHaveParticipants : !splitValid)
 
     return (
@@ -560,16 +573,84 @@ export default function CreateExpense() {
                             </div>
 
                             <div className="field-group" style={{ gridColumn: '1 / -1' }}>
-                                <label className="field-label">Paid by</label>
-                                <select
-                                    className="field-select"
-                                    value={paidByUserId}
-                                    onChange={(e) => setPaidByUserId(e.target.value)}
-                                >
-                                    {users.map((u) => (
-                                        <option key={u.id} value={u.id}>{u.name}</option>
-                                    ))}
-                                </select>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.375rem' }}>
+                                    <label className="field-label" style={{ margin: 0 }}>Paid by</label>
+                                    <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
+                                        {(['single', 'multiple'] as const).map((mode) => (
+                                            <button
+                                                key={mode}
+                                                type="button"
+                                                onClick={() => setPayMode(mode)}
+                                                style={{
+                                                    padding: '0.2rem 0.5rem',
+                                                    fontSize: '0.7rem',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    fontFamily: 'var(--font-jakarta), sans-serif',
+                                                    background: payMode === mode ? 'var(--surface-3)' : 'none',
+                                                    color: payMode === mode ? 'var(--heading)' : 'var(--dim)',
+                                                    transition: 'background 0.15s, color 0.15s',
+                                                }}
+                                            >
+                                                {mode === 'single' ? 'One' : 'Multiple'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {payMode === 'single' ? (
+                                    <select
+                                        className="field-select"
+                                        value={paidByUserId}
+                                        onChange={(e) => setPaidByUserId(e.target.value)}
+                                    >
+                                        {users.map((u) => (
+                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                                        {users.map((user) => (
+                                            <div key={user.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <span style={{ flex: 1, fontSize: '0.875rem', color: 'var(--body)' }}>{user.name}</span>
+                                                <input
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="0.01"
+                                                    placeholder="0.00"
+                                                    value={payAmounts[user.id] || ''}
+                                                    onChange={(e) =>
+                                                        setPayAmounts({
+                                                            ...payAmounts,
+                                                            [user.id]: parseFloat(e.target.value) || 0,
+                                                        })
+                                                    }
+                                                    className="font-mono no-spinner"
+                                                    style={{
+                                                        width: '80px',
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        borderBottom: '1px solid var(--border-2)',
+                                                        color: 'var(--heading)',
+                                                        fontSize: '0.875rem',
+                                                        textAlign: 'right',
+                                                        outline: 'none',
+                                                        padding: '0.125rem 0',
+                                                    }}
+                                                />
+                                            </div>
+                                        ))}
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.75rem', marginTop: '0.125rem' }}>
+                                            {amount > 0 && Math.abs(payRemaining) < 0.01 ? (
+                                                <span style={{ color: 'var(--green)' }}>All assigned</span>
+                                            ) : amount > 0 ? (
+                                                <span style={{ color: Math.abs(payRemaining) < 0.005 ? 'var(--green)' : 'var(--muted)' }}>
+                                                    {currency} {Math.abs(payRemaining).toFixed(2)} {payRemaining > 0 ? 'remaining' : 'over'}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="field-group" style={{ gridColumn: '1 / -1' }}>

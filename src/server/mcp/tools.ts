@@ -36,10 +36,10 @@ export const mcpTools = {
 
     create_expense: {
         description:
-            'Create a new expense in a group. CONFIRM WITH THE USER before calling. Splits are even across all members by default; pass splitUserIds to restrict the even-split to specific members, or splitAmounts for explicit per-user amounts. If both are provided, splitAmounts takes precedence.',
+            'Create a new expense in a group. CONFIRM WITH THE USER before calling. Splits are even across all members by default; pass splitUserIds to restrict the even-split to specific members, or splitAmounts for explicit per-user amounts. For multi-payer expenses (e.g. two people each paid part of the bill) pass payAmounts instead of paidByUserId; amounts in payAmounts must sum to `amount`.',
         inputSchema: {
             groupId: groupIdSchema,
-            paidByUserId: z.string().length(26).describe('The ULID of the user who paid'),
+            paidByUserId: z.string().length(26).describe('The ULID of the user who paid (for single-payer expenses)'),
             title: z.string().min(1),
             amount: z.number().positive(),
             currency: z
@@ -61,6 +61,10 @@ export const mcpTools = {
                 .array(z.object({ userId: z.string().length(26), amount: z.number().positive() }))
                 .optional()
                 .describe('Manual split amounts. Sum must equal `amount`. If provided, splitUserIds is ignored.'),
+            payAmounts: z
+                .array(z.object({ userId: z.string().length(26), amount: z.number().positive() }))
+                .optional()
+                .describe('Multi-payer contributions. Sum must equal `amount`. When provided, paidByUserId is ignored for balance calculations.'),
         },
         handler: async (input: {
             groupId: string
@@ -73,6 +77,7 @@ export const mcpTools = {
             expenseDate?: string
             splitUserIds?: string[]
             splitAmounts?: { userId: string; amount: number }[]
+            payAmounts?: { userId: string; amount: number }[]
         }) =>
             api.expense.create({
                 ...input,

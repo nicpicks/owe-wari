@@ -18,6 +18,12 @@ function humanizeFields(fields: string[]): string {
     return fields.map((f) => FIELD_LABELS[f] ?? f).join(', ')
 }
 
+function joinNames(names: string[]): string {
+    if (names.length <= 1) return names[0] ?? ''
+    if (names.length === 2) return `${names[0]} & ${names[1]}`
+    return `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`
+}
+
 const TYPE_ICON = {
     expense:    { bg: 'rgba(242,160,7,0.12)',  fg: 'var(--amber)', glyph: '+' },
     settlement: { bg: 'rgba(52,211,153,0.12)', fg: 'var(--green)', glyph: '↔' },
@@ -138,16 +144,29 @@ const HistoryTab = () => {
 
                                     {/* Description */}
                                     <div style={{ flex: 1, minWidth: 0, fontSize: '0.9375rem', color: 'var(--body)' }}>
-                                        {event.type === 'expense' && (
-                                            <>
-                                                <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.actorName}</span>
-                                                {' added '}
-                                                <span style={{ fontStyle: 'italic' }}>&quot;{event.title}&quot;</span>{' '}
-                                                <span className="font-mono" style={{ color: 'var(--amber)' }}>
-                                                    {formatAmount(parseFloat(event.amount), event.currency)}
-                                                </span>
-                                            </>
-                                        )}
+                                        {event.type === 'expense' && (() => {
+                                            const multiPayer = event.payers.length > 1
+                                            const payerLabel = multiPayer
+                                                ? joinNames(event.payers.map((p) => p.name))
+                                                : event.actorName
+                                            return (
+                                                <>
+                                                    <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{payerLabel}</span>
+                                                    {' added '}
+                                                    <span style={{ fontStyle: 'italic' }}>&quot;{event.title}&quot;</span>{' '}
+                                                    <span className="font-mono" style={{ color: 'var(--amber)' }}>
+                                                        {formatAmount(parseFloat(event.amount), event.currency)}
+                                                    </span>
+                                                    {multiPayer && (
+                                                        <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: '0.125rem' }}>
+                                                            {event.payers
+                                                                .map((p) => `${p.name} paid ${formatAmount(parseFloat(p.amount), event.currency)}`)
+                                                                .join(' · ')}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )
+                                        })()}
                                         {event.type === 'settlement' && (
                                             <>
                                                 <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{event.actorName}</span>

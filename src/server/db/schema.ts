@@ -171,6 +171,30 @@ export const settlements = createTable(
     })
 )
 
+export const expensePayments = createTable(
+    'expense_payments',
+    {
+        id: serial('id').primaryKey().notNull(),
+        expenseId: integer('expense_id')
+            .references(() => expenses.id)
+            .notNull(),
+        userId: varchar('user_id', { length: 26 })
+            .references(() => users.id)
+            .notNull(),
+        amount: numeric('amount').notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+        updatedAt: timestamp('updated_at', { withTimezone: true }).default(
+            sql`CURRENT_TIMESTAMP`
+        ),
+    },
+    (t) => ({
+        expenseIdIdx: index('idx_expense_payments_expense_id').on(t.expenseId),
+        userIdIdx: index('idx_expense_payments_user_id').on(t.userId),
+    })
+)
+
 export const expenseAudits = createTable(
     'expense_audits',
     {
