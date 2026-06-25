@@ -64,6 +64,13 @@
       "when": 1747699200000,
       "tag": "0009_rename_accommodation_category",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1751068800000,
+      "tag": "0010_expense_payments",
+      "breakpoints": true
     }
   ]
 }

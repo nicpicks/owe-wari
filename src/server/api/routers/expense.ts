@@ -6,6 +6,7 @@ import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import {
     expenses,
     expenseAudits,
+    expensePayments,
     expenseSplits,
     groupMembers,
     groupCurrencies,
@@ -34,6 +35,10 @@ export const expenseRouter = createTRPCRouter({
                     userId: z.string(),
                     amount: z.number().positive(),
                 })).optional(),
+                payAmounts: z.array(z.object({
+                    userId: z.string(),
+                    amount: z.number().positive(),
+                })).optional(),
             })
         )
         .mutation(async ({ ctx, input }) => {
@@ -53,12 +58,19 @@ export const expenseRouter = createTRPCRouter({
                         throw new Error(`Currency ${input.currency} is not enabled for this group`)
                     }
 
+                    // Determine the primary payer (for display/history): largest contributor or explicit single payer
+                    let primaryPayerId = input.paidByUserId
+                    if (input.payAmounts && input.payAmounts.length > 0) {
+                        const largest = input.payAmounts.reduce((a, b) => a.amount >= b.amount ? a : b)
+                        primaryPayerId = largest.userId
+                    }
+
                     const [newExpense] = await trx
                         .insert(expenses)
                         .values({
                             groupId: input.groupId,
-                            paidByUserId: input.paidByUserId,
-                            createdByUserId: input.createdByUserId ?? input.paidByUserId,
+                            paidByUserId: primaryPayerId,
+                            createdByUserId: input.createdByUserId ?? primaryPayerId,
                             title: input.title,
                             amount: input.amount.toString(),
                             currency: input.currency,
@@ -72,6 +84,25 @@ export const expenseRouter = createTRPCRouter({
                         throw new Error('Failed to create expense')
                     }
                     const expenseId = newExpense.id
+
+                    // Insert payment rows
+                    if (input.payAmounts && input.payAmounts.length > 0) {
+                        await trx
+                            .insert(expensePayments)
+                            .values(
+                                input.payAmounts.map(({ userId, amount }) => ({
+                                    expenseId,
+                                    userId,
+                                    amount: amount.toString(),
+                                }))
+                            )
+                            .execute()
+                    } else {
+                        await trx
+                            .insert(expensePayments)
+                            .values({ expenseId, userId: primaryPayerId, amount: input.amount.toString() })
+                            .execute()
+                    }
 
                     let splitUserIds = input.splitUserIds
                     if (!splitUserIds || splitUserIds.length === 0) {
@@ -259,18 +290,30 @@ export const expenseRouter = createTRPCRouter({
 
                 if (!expense) throw new Error('Expense not found')
 
-                const splits = await ctx.db
-                    .select({
-                        userId: expenseSplits.userId,
-                        name: users.name,
-                        amount: expenseSplits.amount,
-                    })
-                    .from(expenseSplits)
-                    .innerJoin(users, eq(users.id, expenseSplits.userId))
-                    .where(eq(expenseSplits.expenseId, input.expenseId))
-                    .execute()
+                const [splits, payments] = await Promise.all([
+                    ctx.db
+                        .select({
+                            userId: expenseSplits.userId,
+                            name: users.name,
+                            amount: expenseSplits.amount,
+                        })
+                        .from(expenseSplits)
+                        .innerJoin(users, eq(users.id, expenseSplits.userId))
+                        .where(eq(expenseSplits.expenseId, input.expenseId))
+                        .execute(),
+                    ctx.db
+                        .select({
+                            userId: expensePayments.userId,
+                            name: users.name,
+                            amount: expensePayments.amount,
+                        })
+                        .from(expensePayments)
+                        .innerJoin(users, eq(users.id, expensePayments.userId))
+                        .where(eq(expensePayments.expenseId, input.expenseId))
+                        .execute(),
+                ])
 
-                return { ...expense, splits }
+                return { ...expense, splits, payments }
             } catch (error) {
                 console.error('Error getting expense:', error)
                 throw new Error('Failed to get expense')
@@ -452,13 +495,14 @@ export const expenseRouter = createTRPCRouter({
 
                 const paidRows = await ctx.db
                     .select({
-                        userId: expenses.paidByUserId,
+                        userId: expensePayments.userId,
                         currency: expenses.currency,
-                        total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+                        total: sql<string>`COALESCE(SUM(${expensePayments.amount}), 0)`,
                     })
-                    .from(expenses)
+                    .from(expensePayments)
+                    .innerJoin(expenses, eq(expensePayments.expenseId, expenses.id))
                     .where(and(eq(expenses.groupId, groupId), notDeleted))
-                    .groupBy(expenses.paidByUserId, expenses.currency)
+                    .groupBy(expensePayments.userId, expenses.currency)
                     .execute()
 
                 const owedRows = await ctx.db
@@ -548,13 +592,14 @@ export const expenseRouter = createTRPCRouter({
                     ctx.db
                         .select({
                             currency: expenses.currency,
-                            total: sql<string>`COALESCE(SUM(${expenses.amount}), 0)`,
+                            total: sql<string>`COALESCE(SUM(${expensePayments.amount}), 0)`,
                         })
-                        .from(expenses)
+                        .from(expensePayments)
+                        .innerJoin(expenses, eq(expensePayments.expenseId, expenses.id))
                         .where(
                             and(
                                 eq(expenses.groupId, groupId),
-                                eq(expenses.paidByUserId, userId),
+                                eq(expensePayments.userId, userId),
                                 notDeleted
                             )
                         )
@@ -577,12 +622,13 @@ export const expenseRouter = createTRPCRouter({
                         .groupBy(expenses.currency)
                         .execute(),
                     ctx.db
-                        .select({ count: sql<string>`COUNT(*)` })
-                        .from(expenses)
+                        .select({ count: sql<string>`COUNT(DISTINCT ${expensePayments.expenseId})` })
+                        .from(expensePayments)
+                        .innerJoin(expenses, eq(expensePayments.expenseId, expenses.id))
                         .where(
                             and(
                                 eq(expenses.groupId, groupId),
-                                eq(expenses.paidByUserId, userId),
+                                eq(expensePayments.userId, userId),
                                 notDeleted
                             )
                         )

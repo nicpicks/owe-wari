@@ -332,7 +332,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                 )}
                             </div>
 
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-start justify-between gap-3">
                                 <span style={{ color: 'var(--muted)' }} className="text-sm">Paid by</span>
                                 {isEditing ? (
                                     <select
@@ -345,6 +345,14 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                             <option key={u.id} value={u.id}>{u.name}</option>
                                         ))}
                                     </select>
+                                ) : expense.payments && expense.payments.length > 1 ? (
+                                    <div className="flex flex-col items-end gap-1">
+                                        {expense.payments.map((p) => (
+                                            <span key={p.userId} className="text-sm font-medium" style={{ color: 'var(--heading)' }}>
+                                                {p.name} <span className="font-mono" style={{ color: 'var(--muted)' }}>({formatAmount(parseFloat(p.amount), expense.currency)})</span>
+                                            </span>
+                                        ))}
+                                    </div>
                                 ) : (
                                     <span className="text-sm font-medium" style={{ color: 'var(--heading)' }}>
                                         {expense.paidByName}
