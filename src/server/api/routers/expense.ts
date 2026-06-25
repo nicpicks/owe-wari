@@ -189,7 +189,7 @@ export const expenseRouter = createTRPCRouter({
                 const payerUsers = alias(users, 'payer_users')
                 const receiverUsers = alias(users, 'receiver_users')
 
-                const [expenseRows, settlementRows, auditRows, deleteRows] = await Promise.all([
+                const [expenseRows, settlementRows, auditRows, deleteRows, paymentRows] = await Promise.all([
                     ctx.db
                         .select({
                             id: expenses.id,
@@ -247,10 +247,34 @@ export const expenseRouter = createTRPCRouter({
                         .innerJoin(users, eq(users.id, expenses.createdByUserId))
                         .where(and(eq(expenses.groupId, input.groupId), isNotNull(expenses.deletedAt)))
                         .execute(),
+                    ctx.db
+                        .select({
+                            expenseId: expensePayments.expenseId,
+                            name: users.name,
+                            amount: expensePayments.amount,
+                        })
+                        .from(expensePayments)
+                        .innerJoin(expenses, eq(expenses.id, expensePayments.expenseId))
+                        .innerJoin(users, eq(users.id, expensePayments.userId))
+                        .where(eq(expenses.groupId, input.groupId))
+                        .execute(),
                 ])
 
+                // Group payment rows by expense so multi-payer expenses can show a
+                // per-payer breakdown in the feed. Single-payer expenses get one entry.
+                const payersByExpense = new Map<number, { name: string; amount: string }[]>()
+                for (const p of paymentRows) {
+                    const list = payersByExpense.get(p.expenseId) ?? []
+                    list.push({ name: p.name, amount: p.amount })
+                    payersByExpense.set(p.expenseId, list)
+                }
+
                 const events = [
-                    ...expenseRows.map((r) => ({ type: 'expense' as const, ...r })),
+                    ...expenseRows.map((r) => ({
+                        type: 'expense' as const,
+                        ...r,
+                        payers: payersByExpense.get(r.id) ?? [],
+                    })),
                     ...settlementRows.map((r) => ({ type: 'settlement' as const, ...r })),
                     ...auditRows.map((r) => ({ type: 'edit' as const, ...r })),
                     ...deleteRows
