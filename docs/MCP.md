@@ -18,7 +18,7 @@ If you change the **input shape** of an existing procedure (rename a field, add 
 
 | Tool | Backed by | Mutation? | Notes |
 |---|---|---|---|
-| `get_group` | `group.getGroup` + `group.getUsers` + `group.getCurrencies` | no | Single round-trip combining group + members + currencies |
+| `get_group` | `group.getGroup` + `group.getUsers` + `group.getCurrencies` | no | Single round-trip combining group + members + currencies. Includes `tripUrl` (linked Jiogo itinerary) when set |
 | `list_expenses` | `expense.getExpenses` | no | |
 | `create_expense` | `expense.create` | yes | Tool description tells the AI to confirm with the user first |
 | `get_balances` | `expense.getBalances` | no | Per-(user, currency) net balances |

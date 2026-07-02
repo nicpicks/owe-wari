@@ -19,6 +19,7 @@ const SettingsTab = () => {
     const [users, setUsers] = useState<User[]>([])
     const [copied, setCopied] = useState(false)
     const [newMemberName, setNewMemberName] = useState('')
+    const [tripUrl, setTripUrl] = useState('')
     const { identity, setIdentity, clearIdentity } = useGroupIdentity(groupId)
     const identityName = users.find((u) => u.id === identity)?.name
 
@@ -43,10 +44,19 @@ const SettingsTab = () => {
         { enabled: !!groupId }
     )
 
+    const { data: groupData } = api.group.getGroup.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId }
+    )
+
     useEffect(() => {
         if (defaultPayeeData) setDefaultPayee(defaultPayeeData)
         if (usersData) setUsers(usersData)
     }, [defaultPayeeData, usersData])
+
+    useEffect(() => {
+        setTripUrl(groupData?.tripUrl ?? '')
+    }, [groupData?.tripUrl])
 
     const utils = api.useUtils()
 
@@ -78,6 +88,21 @@ const SettingsTab = () => {
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault()
         if (groupId) updateDefaultPayee.mutate({ groupId, defaultPayee })
+    }
+
+    const updateTripLink = api.group.updateTripLink.useMutation({
+        onSuccess: async () => {
+            await utils.group.getGroup.invalidate({ groupId: groupId ?? '' })
+        },
+        onError: (error) => {
+            console.error('Error updating trip link', error)
+            alert('Failed to save trip link — make sure it is a valid URL')
+        },
+    })
+
+    const handleSaveTripLink = () => {
+        if (!groupId) return
+        updateTripLink.mutate({ groupId, tripUrl: tripUrl.trim() })
     }
 
     return (
@@ -206,8 +231,61 @@ const SettingsTab = () => {
                         </div>
                     </div>
 
+                    {/* Trip itinerary link */}
+                    <div className="card-dark anim-fade-up d-4" style={{ marginBottom: '1rem' }}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
+                                Trip Itinerary
+                            </div>
+                            <div className="section-sub">
+                                Link a Jiogo trip so the group can jump straight to the itinerary
+                            </div>
+                        </div>
+
+                        <div className="copy-row">
+                            <input
+                                type="url"
+                                placeholder="https://jiogo.vercel.app/trips/…"
+                                value={tripUrl}
+                                onChange={(e) => setTripUrl(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTripLink() } }}
+                            />
+                            <button
+                                type="button"
+                                className="btn-amber"
+                                onClick={handleSaveTripLink}
+                                disabled={updateTripLink.isPending}
+                                style={{ flexShrink: 0 }}
+                            >
+                                {updateTripLink.isPending ? 'Saving…' : 'Save'}
+                            </button>
+                        </div>
+
+                        {groupData?.tripUrl && (
+                            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                <a
+                                    href={groupData.tripUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: 'var(--green)', fontSize: '0.875rem', textDecoration: 'underline' }}
+                                >
+                                    Open itinerary ↗
+                                </a>
+                                <button
+                                    type="button"
+                                    className="btn-ghost"
+                                    onClick={() => {
+                                        if (groupId) updateTripLink.mutate({ groupId, tripUrl: '' })
+                                    }}
+                                >
+                                    Unlink
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Invite link */}
-                    <div className="card-dark anim-fade-up d-4">
+                    <div className="card-dark anim-fade-up d-5">
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Invite Link
