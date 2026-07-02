@@ -34,6 +34,8 @@ export const groups = createTable('groups', {
     defaultPayee: varchar('default_payee', { length: 26 }).references(
         () => users.id
     ),
+    // Link to a companion trip itinerary (e.g. a Jiogo trip URL)
+    tripUrl: varchar('trip_url', { length: 512 }),
     createdAt: timestamp('created_at', { withTimezone: true })
         .default(sql`CURRENT_TIMESTAMP`)
         .notNull(),

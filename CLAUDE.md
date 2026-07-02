@@ -45,7 +45,7 @@ All tables are prefixed `owe-wari_` (multi-project schema). Key relationships:
 
 ### tRPC API (`src/server/api/`)
 Three routers exposed at `/api/trpc`:
-- `group` — `create`, `getGroup`, `getUsers`, `addMember`, `getCurrencies`, `getDefaultPayee`, `updateDefaultPayee`
+- `group` — `create`, `getGroup`, `getUsers`, `addMember`, `getCurrencies`, `getDefaultPayee`, `updateDefaultPayee`, `updateTripLink`
 - `expense` — `create`, `update` (writes an `expense_audits` row when fields change), `delete` (soft delete), `getExpense`, `getExpenses` (filters out deleted), `getTotalExpenseCost`, `getBalances`, `settleUp` (accepts per-currency lines), `getHistory` (unified feed of expense / settlement / edit / delete events)
 - `receipt` — `scan` (Gemini-based receipt parsing for prefilling expense forms)
 
@@ -64,6 +64,9 @@ Three routers exposed at `/api/trpc`:
 
 ### MCP server
 The app exposes an MCP endpoint at `/api/mcp/mcp` for AI clients. When you add or change a tRPC procedure, see [`docs/MCP.md`](docs/MCP.md) — you may need to update the tool catalog in `src/server/mcp/tools.ts` to match.
+
+### Jiogo integration
+Groups can link to a [Jiogo](https://jiogo.vercel.app) trip itinerary via `groups.trip_url` (set in group settings, shown as an "Itinerary ↗" link in the group header). `POST /api/integration/group-from-trip` is a public CORS-enabled endpoint that creates a pre-linked group from a trip (Jiogo calls it from its "Create expense group" button). See [`docs/INTEGRATION.md`](docs/INTEGRATION.md).
 
 ### Path aliases
 `~` maps to `./src` (configured in `tsconfig.json`).

@@ -15,6 +15,7 @@ export const groupRouter = createTRPCRouter({
                 description: z.string(),
                 userNames: z.array(z.string().min(1)),
                 defaultPayee: z.string(),
+                tripUrl: z.string().url().max(512).optional(),
             })
         )
         .mutation(async ({ ctx, input }) => {
@@ -24,37 +25,36 @@ export const groupRouter = createTRPCRouter({
                 }
 
                 const groupId = ulid()
-                const newGroup = await ctx.db
-                    .insert(groups)
-                    .values({
+                const members = input.userNames.map((name) => ({ id: ulid(), name }))
+                const defaultPayeeId =
+                    members.find((m) => m.name === input.defaultPayee)?.id ?? null
+
+                await ctx.db.transaction(async (tx) => {
+                    if (members.length > 0) {
+                        await tx.insert(users).values(members)
+                    }
+
+                    await tx.insert(groups).values({
                         id: groupId,
                         name: input.name,
                         currency: input.currency,
                         description: input.description,
+                        defaultPayee: defaultPayeeId,
+                        tripUrl: input.tripUrl ?? null,
                     })
-                    .returning({ id: groups.id })
 
-                await ctx.db
-                    .insert(groupCurrencies)
-                    .values(input.currencies.map((code) => ({ groupId, code })))
+                    await tx
+                        .insert(groupCurrencies)
+                        .values(input.currencies.map((code) => ({ groupId, code })))
 
-                let defaultPayeeId = ''
-                for (const userName of input.userNames) {
-                    const userId = ulid()
-                    if (userName === input.defaultPayee) defaultPayeeId = userId
-                    await ctx.db.insert(users).values({ id: userId, name: userName })
-                    await ctx.db.insert(groupMembers).values({ groupId, userId })
-                }
+                    if (members.length > 0) {
+                        await tx
+                            .insert(groupMembers)
+                            .values(members.map((m) => ({ groupId, userId: m.id })))
+                    }
+                })
 
-                if (defaultPayeeId) {
-                    await ctx.db
-                        .update(groups)
-                        .set({ defaultPayee: defaultPayeeId })
-                        .where(eq(groups.id, groupId))
-                        .execute()
-                }
-
-                return { success: true, id: newGroup[0]?.id }
+                return { success: true, id: groupId }
             } catch (error) {
                 console.error('Error inserting group:', error)
                 throw new Error('Failed to create group')
@@ -66,7 +66,12 @@ export const groupRouter = createTRPCRouter({
         .query(async ({ ctx, input }) => {
             try {
                 const result = await ctx.db
-                    .select({ id: groups.id, name: groups.name, currency: groups.currency })
+                    .select({
+                        id: groups.id,
+                        name: groups.name,
+                        currency: groups.currency,
+                        tripUrl: groups.tripUrl,
+                    })
                     .from(groups)
                     .where(eq(groups.id, input.groupId))
                     .execute()
@@ -170,12 +175,43 @@ export const groupRouter = createTRPCRouter({
         .mutation(async ({ ctx, input }) => {
             try {
                 const userId = ulid()
-                await ctx.db.insert(users).values({ id: userId, name: input.name })
-                await ctx.db.insert(groupMembers).values({ groupId: input.groupId, userId })
+                await ctx.db.transaction(async (tx) => {
+                    await tx.insert(users).values({ id: userId, name: input.name })
+                    await tx
+                        .insert(groupMembers)
+                        .values({ groupId: input.groupId, userId })
+                })
                 return { id: userId, name: input.name }
             } catch (error) {
                 console.error('Error adding member:', error)
                 throw new Error('Failed to add member')
+            }
+        }),
+
+    updateTripLink: publicProcedure
+        .input(
+            z.object({
+                groupId: z.string(),
+                // Empty string unlinks the trip
+                tripUrl: z.union([z.literal(''), z.string().url().max(512)]),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            try {
+                const result = await ctx.db
+                    .update(groups)
+                    .set({ tripUrl: input.tripUrl || null })
+                    .where(eq(groups.id, input.groupId))
+                    .returning({ id: groups.id })
+
+                if (result.length === 0) {
+                    throw new Error('No group found with the provided ID')
+                }
+
+                return { success: true }
+            } catch (error) {
+                console.error('Error updating trip link', error)
+                throw new Error('Failed to update trip link')
             }
         }),
 })

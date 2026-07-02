@@ -30,6 +30,19 @@ const Tabs = ({
             {group?.name && (
                 <div style={{ textAlign: 'center', padding: '1rem 1rem 0', fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>
                     {group.name}
+                    {group.tripUrl && (
+                        <>
+                            {' · '}
+                            <a
+                                href={group.tripUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: 'var(--green)', textDecoration: 'none' }}
+                            >
+                                Itinerary ↗
+                            </a>
+                        </>
+                    )}
                 </div>
             )}
             <nav className="tab-bar" style={{ width: '100vw', marginLeft: 'calc(-50vw + 50%)' }}>
