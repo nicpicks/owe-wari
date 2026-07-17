@@ -83,6 +83,23 @@ async function waitForNetworkIdle(page, timeout = 5000) {
     await page.waitForNetworkIdle({ idleTime: 500, timeout }).catch(() => {})
 }
 
+// Dismisses the "Who are you?" identity modal if it's showing, so it
+// doesn't obscure the page underneath in the screenshot.
+async function dismissIdentityModal(page) {
+    const dismissed = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'))
+        const notNow = buttons.find((b) => b.textContent?.trim() === 'Not now')
+        if (notNow) {
+            notNow.click()
+            return true
+        }
+        return false
+    })
+    if (dismissed) {
+        await new Promise((r) => setTimeout(r, 200))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Seed: create a test group via tRPC
 // ---------------------------------------------------------------------------
@@ -221,22 +238,24 @@ async function main() {
         await screenshot(page, '03-create-group')
 
         // ------------------------------------------------------------------
-        // 5–9. Group tab pages
+        // 5–10. Group tab pages
         // ------------------------------------------------------------------
-        const groupTabs = ['summary', 'expenses', 'balances', 'history', 'settings']
-        for (let i = 0; i < groupTabs.length; i++) {
-            const tab = groupTabs[i]
+        const groupTabs = ['summary', 'expenses', 'totals', 'balances', 'history', 'settings']
+        let n = 4
+        for (const tab of groupTabs) {
             await page.goto(`${BASE_URL}/groups/${groupId}/${tab}`, {
                 waitUntil: 'networkidle2',
             })
             await waitForNetworkIdle(page)
             // Small settle to let React finish rendering
             await new Promise((r) => setTimeout(r, 600))
-            await screenshot(page, `0${4 + i}-group-${tab}`)
+            await dismissIdentityModal(page)
+            await screenshot(page, `${String(n).padStart(2, '0')}-group-${tab}`)
+            n++
         }
 
         // ------------------------------------------------------------------
-        // 10. Create expense page
+        // 11. Create expense page
         // ------------------------------------------------------------------
         await page.goto(
             `${BASE_URL}/groups/${groupId}/expenses/create`,
@@ -244,7 +263,8 @@ async function main() {
         )
         await waitForNetworkIdle(page)
         await new Promise((r) => setTimeout(r, 600))
-        await screenshot(page, '09-create-expense')
+        await dismissIdentityModal(page)
+        await screenshot(page, `${String(n).padStart(2, '0')}-create-expense`)
 
         console.log(`\n✅  All screenshots saved to screenshots/\n`)
     } finally {
