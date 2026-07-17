@@ -1,8 +1,9 @@
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import { groups, users, groupMembers, groupCurrencies } from '~/server/db/schema'
+import { isSupportedCurrency } from '~/lib/currencies'
 import { ulid } from 'ulid'
 
 export const groupRouter = createTRPCRouter({
@@ -108,6 +109,71 @@ export const groupRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error fetching currencies:', error)
                 throw new Error('Failed to fetch currencies')
+            }
+        }),
+
+    updateCurrencies: publicProcedure
+        .input(
+            z.object({
+                groupId: z.string(),
+                currencies: z
+                    .array(z.string().trim().toUpperCase().length(3))
+                    .min(1),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const codes = Array.from(new Set(input.currencies))
+            const unsupported = codes.filter((code) => !isSupportedCurrency(code))
+            if (unsupported.length > 0) {
+                throw new Error(`Unsupported currency code(s): ${unsupported.join(', ')}`)
+            }
+
+            const [group] = await ctx.db
+                .select({ defaultCode: groups.currency })
+                .from(groups)
+                .where(eq(groups.id, input.groupId))
+                .execute()
+
+            if (!group) {
+                throw new Error('No group found with the provided ID')
+            }
+            if (!codes.includes(group.defaultCode)) {
+                throw new Error('The default currency cannot be removed')
+            }
+
+            try {
+                const existing = await ctx.db
+                    .select({ code: groupCurrencies.code })
+                    .from(groupCurrencies)
+                    .where(eq(groupCurrencies.groupId, input.groupId))
+                    .execute()
+
+                const existingCodes = new Set(existing.map((row) => row.code))
+                const toAdd = codes.filter((code) => !existingCodes.has(code))
+                const toRemove = [...existingCodes].filter((code) => !codes.includes(code))
+
+                await ctx.db.transaction(async (tx) => {
+                    if (toRemove.length > 0) {
+                        await tx
+                            .delete(groupCurrencies)
+                            .where(
+                                and(
+                                    eq(groupCurrencies.groupId, input.groupId),
+                                    inArray(groupCurrencies.code, toRemove)
+                                )
+                            )
+                    }
+                    if (toAdd.length > 0) {
+                        await tx
+                            .insert(groupCurrencies)
+                            .values(toAdd.map((code) => ({ groupId: input.groupId, code })))
+                    }
+                })
+
+                return { success: true }
+            } catch (error) {
+                console.error('Error updating currencies:', error)
+                throw new Error('Failed to update currencies')
             }
         }),
 

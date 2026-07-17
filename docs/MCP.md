@@ -23,6 +23,7 @@ If you change the **input shape** of an existing procedure (rename a field, add 
 | `create_expense` | `expense.create` | yes | Tool description tells the AI to confirm with the user first |
 | `get_balances` | `expense.getBalances` | no | Per-(user, currency) net balances |
 | `settle_up` | `expense.settleUp` | yes | Multi-currency `lines` array |
+| `update_currencies` | `group.updateCurrencies` | yes | Full-list replace; default currency cannot be removed |
 | `add_member` | `group.addMember` | yes | |
 
 There is intentionally no `list_all_groups` tool. Group ULIDs are 128 bits of entropy and act as the only access control, so MCP clients must already know the group ID (e.g., from a URL the user shared). The AI assistant is expected to remember known group IDs in its own context/memory.
