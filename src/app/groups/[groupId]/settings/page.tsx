@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import Tabs from '~/app/_components/tabs'
 import { api } from '~/trpc/react'
 import { useGroupIdentity } from '~/app/_components/use-group-identity'
+import { SUPPORTED_CURRENCIES } from '~/lib/currencies'
 
 interface User {
     id: string
@@ -20,6 +21,7 @@ const SettingsTab = () => {
     const [copied, setCopied] = useState(false)
     const [newMemberName, setNewMemberName] = useState('')
     const [tripUrl, setTripUrl] = useState('')
+    const [currencies, setCurrencies] = useState<string[]>([])
     const { identity, setIdentity, clearIdentity } = useGroupIdentity(groupId)
     const identityName = users.find((u) => u.id === identity)?.name
 
@@ -49,10 +51,20 @@ const SettingsTab = () => {
         { enabled: !!groupId }
     )
 
+    const { data: groupCurrenciesData } = api.group.getCurrencies.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId }
+    )
+    const defaultCurrency = groupCurrenciesData?.find((c) => c.isDefault)?.code
+
     useEffect(() => {
         if (defaultPayeeData) setDefaultPayee(defaultPayeeData)
         if (usersData) setUsers(usersData)
     }, [defaultPayeeData, usersData])
+
+    useEffect(() => {
+        if (groupCurrenciesData) setCurrencies(groupCurrenciesData.map((c) => c.code))
+    }, [groupCurrenciesData])
 
     useEffect(() => {
         setTripUrl(groupData?.tripUrl ?? '')
@@ -103,6 +115,22 @@ const SettingsTab = () => {
     const handleSaveTripLink = () => {
         if (!groupId) return
         updateTripLink.mutate({ groupId, tripUrl: tripUrl.trim() })
+    }
+
+    const updateCurrencies = api.group.updateCurrencies.useMutation({
+        onSuccess: async () => {
+            await utils.group.getCurrencies.invalidate({ groupId: groupId ?? '' })
+            alert('Currencies updated')
+        },
+        onError: (error) => {
+            console.error('Error updating currencies', error)
+            alert('Failed to update currencies')
+        },
+    })
+
+    const handleSaveCurrencies = () => {
+        if (!groupId || currencies.length === 0) return
+        updateCurrencies.mutate({ groupId, currencies })
     }
 
     return (
@@ -231,8 +259,79 @@ const SettingsTab = () => {
                         </div>
                     </div>
 
-                    {/* Trip itinerary link */}
+                    {/* Currencies */}
                     <div className="card-dark anim-fade-up d-4" style={{ marginBottom: '1rem' }}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
+                                Currencies
+                            </div>
+                            <div className="section-sub">
+                                Which currencies expenses can be logged in. Removing one keeps existing expenses intact.
+                            </div>
+                        </div>
+
+                        <div
+                            style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: '0.5rem',
+                            }}
+                        >
+                            {SUPPORTED_CURRENCIES.map((c) => {
+                                const isDefault = c === defaultCurrency
+                                const checked = currencies.includes(c)
+                                return (
+                                    <label
+                                        key={c}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            padding: '0.5rem 0.625rem',
+                                            border: `1px solid ${checked ? 'var(--amber)' : 'var(--border)'}`,
+                                            borderRadius: '6px',
+                                            background: checked ? 'var(--amber-dim)' : 'var(--surface-2)',
+                                            cursor: isDefault ? 'not-allowed' : 'pointer',
+                                            opacity: isDefault ? 0.85 : 1,
+                                            fontSize: '0.8125rem',
+                                            color: 'var(--body)',
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            disabled={isDefault}
+                                            onChange={(e) => {
+                                                if (isDefault) return
+                                                setCurrencies((prev) =>
+                                                    e.target.checked ? [...prev, c] : prev.filter((x) => x !== c)
+                                                )
+                                            }}
+                                            style={{ accentColor: 'var(--amber)' }}
+                                        />
+                                        <span style={{ fontWeight: 600 }}>{c}</span>
+                                        {isDefault && (
+                                            <span style={{ color: 'var(--muted)', fontSize: '0.6875rem' }}>(default)</span>
+                                        )}
+                                    </label>
+                                )
+                            })}
+                        </div>
+
+                        <div style={{ marginTop: '1.25rem' }}>
+                            <button
+                                type="button"
+                                className="btn-amber"
+                                onClick={handleSaveCurrencies}
+                                disabled={updateCurrencies.isPending}
+                            >
+                                {updateCurrencies.isPending ? 'Saving…' : 'Save currencies'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Trip itinerary link */}
+                    <div className="card-dark anim-fade-up d-5" style={{ marginBottom: '1rem' }}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Trip Itinerary
@@ -285,7 +384,7 @@ const SettingsTab = () => {
                     </div>
 
                     {/* Invite link */}
-                    <div className="card-dark anim-fade-up d-5">
+                    <div className="card-dark anim-fade-up d-6">
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Invite Link

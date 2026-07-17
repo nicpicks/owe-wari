@@ -117,6 +117,20 @@ export const mcpTools = {
         }) => api.expense.settleUp(input),
     },
 
+    update_currencies: {
+        description:
+            "Replace the set of currencies enabled for a group. CONFIRM WITH THE USER before calling. Pass the FULL desired list — codes not included are disabled for new expenses (existing expenses are unaffected). The group's default currency must be in the list. Use get_group first to see the current set.",
+        inputSchema: {
+            groupId: groupIdSchema,
+            currencies: z
+                .array(z.string().length(3))
+                .min(1)
+                .describe('The complete list of 3-letter ISO currency codes to enable'),
+        },
+        handler: async (input: { groupId: string; currencies: string[] }) =>
+            api.group.updateCurrencies(input),
+    },
+
     add_member: {
         description: "Add a new member to a group by name. CONFIRM WITH THE USER before calling. Returns the new member's ID and name.",
         inputSchema: {
