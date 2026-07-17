@@ -242,6 +242,7 @@ async function main() {
         // ------------------------------------------------------------------
         const groupTabs = ['summary', 'expenses', 'totals', 'balances', 'history', 'settings']
         let n = 4
+        let identityModalCaptured = false
         for (const tab of groupTabs) {
             await page.goto(`${BASE_URL}/groups/${groupId}/${tab}`, {
                 waitUntil: 'networkidle2',
@@ -249,6 +250,15 @@ async function main() {
             await waitForNetworkIdle(page)
             // Small settle to let React finish rendering
             await new Promise((r) => setTimeout(r, 600))
+
+            // The "Who are you?" identity modal shows on every fresh page load
+            // until an identity is picked (state, not persisted) — capture it
+            // once before dismissing it like the rest of the loop does.
+            if (!identityModalCaptured) {
+                await screenshot(page, '11-modal-identify-self')
+                identityModalCaptured = true
+            }
+
             await dismissIdentityModal(page)
             await screenshot(page, `${String(n).padStart(2, '0')}-group-${tab}`)
             n++
@@ -265,6 +275,57 @@ async function main() {
         await new Promise((r) => setTimeout(r, 600))
         await dismissIdentityModal(page)
         await screenshot(page, `${String(n).padStart(2, '0')}-create-expense`)
+
+        // ------------------------------------------------------------------
+        // 12. Expense detail modal (click the first expense row)
+        // ------------------------------------------------------------------
+        await page.goto(`${BASE_URL}/groups/${groupId}/expenses`, { waitUntil: 'networkidle2' })
+        await waitForNetworkIdle(page)
+        await new Promise((r) => setTimeout(r, 600))
+        await dismissIdentityModal(page)
+        const openedExpenseDetail = await page.evaluate(() => {
+            const row = document.querySelector('[class*="cursor-pointer"]')
+            if (row instanceof HTMLElement) {
+                row.click()
+                return true
+            }
+            return false
+        })
+        if (openedExpenseDetail) {
+            await new Promise((r) => setTimeout(r, 400))
+            await screenshot(page, '12-modal-expense-detail')
+        } else {
+            console.log('  ·  (skipped 12-modal-expense-detail — no expense row found)')
+        }
+
+        // ------------------------------------------------------------------
+        // 13. Settle-up modal (click the first "Settle" button)
+        // ------------------------------------------------------------------
+        await page.goto(`${BASE_URL}/groups/${groupId}/balances`, { waitUntil: 'networkidle2' })
+        await waitForNetworkIdle(page)
+        await new Promise((r) => setTimeout(r, 600))
+        await dismissIdentityModal(page)
+        const openedSettleUp = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button.btn-sm-settle'))
+            const first = buttons[0]
+            if (first instanceof HTMLElement) {
+                first.click()
+                return true
+            }
+            return false
+        })
+        if (openedSettleUp) {
+            await new Promise((r) => setTimeout(r, 400))
+            await screenshot(page, '13-modal-settle-up')
+            // Cancel rather than confirm, so we don't mutate the seeded data.
+            await page.evaluate(() => {
+                const buttons = Array.from(document.querySelectorAll('button'))
+                const cancel = buttons.find((b) => b.textContent?.trim() === 'Cancel')
+                if (cancel instanceof HTMLElement) cancel.click()
+            })
+        } else {
+            console.log('  ·  (skipped 13-modal-settle-up — no outstanding balances to settle)')
+        }
 
         console.log(`\n✅  All screenshots saved to screenshots/\n`)
     } finally {

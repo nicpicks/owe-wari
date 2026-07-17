@@ -48,9 +48,9 @@ export function IdentifySelfModal({ groupId }: IdentifySelfModalProps) {
                 <div style={{ marginBottom: '1rem' }}>
                     <div
                         style={{
-                            fontFamily: 'var(--font-cormorant), serif',
+                            fontFamily: 'var(--font-display), serif',
                             fontSize: '1.5rem',
-                            fontStyle: 'italic',
+                            fontWeight: 700,
                             color: 'var(--heading)',
                             marginBottom: '0.25rem',
                         }}
@@ -79,7 +79,7 @@ export function IdentifySelfModal({ groupId }: IdentifySelfModalProps) {
                                 textAlign: 'left',
                                 cursor: 'pointer',
                                 transition: 'background 0.15s',
-                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                fontFamily: 'var(--font-ui), sans-serif',
                             }}
                         >
                             I&apos;m {u.name}

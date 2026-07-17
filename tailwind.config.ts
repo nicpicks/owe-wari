@@ -5,8 +5,8 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                display: ['var(--font-cormorant)', 'Georgia', 'serif'],
-                ui:      ['var(--font-jakarta)', 'sans-serif'],
+                display: ['var(--font-display)', 'Georgia', 'serif'],
+                ui:      ['var(--font-ui)', 'sans-serif'],
                 mono:    ['var(--font-mono)', 'monospace'],
             },
             colors: {
@@ -21,6 +21,7 @@ export default {
                 body:       'var(--body)',
                 heading:    'var(--heading)',
                 amber:      'var(--amber)',
+                vermillion: 'var(--vermillion)',
                 'amt-green':'var(--green)',
                 'amt-red':  'var(--red)',
             },

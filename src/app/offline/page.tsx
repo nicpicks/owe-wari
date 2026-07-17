@@ -39,7 +39,7 @@ export default function OfflinePage() {
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
                     fontSize: 'clamp(280px, 40vw, 480px)',
-                    fontFamily: 'var(--font-cormorant), serif',
+                    fontFamily: 'var(--font-display), serif',
                     fontWeight: 700,
                     color: 'transparent',
                     WebkitTextStroke: '1px rgba(242,160,7,0.04)',
@@ -88,10 +88,9 @@ export default function OfflinePage() {
                 <div>
                     <h1
                         style={{
-                            fontFamily: 'var(--font-cormorant), serif',
+                            fontFamily: 'var(--font-display), serif',
                             fontSize: 'clamp(2.5rem, 8vw, 3.5rem)',
-                            fontWeight: 600,
-                            fontStyle: 'italic',
+                            fontWeight: 700,
                             color: 'var(--heading)',
                             letterSpacing: '-0.03em',
                             lineHeight: 1,

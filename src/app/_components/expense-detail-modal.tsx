@@ -231,7 +231,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     background: 'var(--red)',
-                                    color: '#0B0B0B',
+                                    color: 'var(--ink)',
                                     fontWeight: 700,
                                     fontSize: '0.875rem',
                                     padding: '0.625rem 1.5rem',

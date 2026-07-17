@@ -2,45 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Design Tokens ─────────────────────────────────────────────── */
+/* ─── Design Tokens — "Izakaya" theme ───────────────────────────── */
+:root {
+  --font-display: 'Shippori Mincho B1';
+  --font-ui:      'Zen Kaku Gothic New';
+}
+
 :root, [data-theme="dark"] {
-  --ink:        #0B0B0B;
-  --surface:    #121212;
-  --surface-2:  #1A1A1A;
-  --surface-3:  #222222;
-  --border:     #242424;
-  --border-2:   #333333;
-  --muted:      #484848;
-  --dim:        #717171;
-  --body:       #C4BFB4;
-  --heading:    #ECE7DC;
-  --amber:      #F2A007;
-  --amber-dim:  rgba(242, 160, 7, 0.14);
-  --green:      #34D399;
-  --green-dim:  rgba(52, 211, 153, 0.12);
-  --red:        #F87171;
-  --red-dim:    rgba(248, 113, 113, 0.12);
-  --tab-bar-bg: rgba(11, 11, 11, 0.92);
+  --ink:        #17110C;
+  --surface:    #211912;
+  --surface-2:  #2B2016;
+  --surface-3:  #332616;
+  --border:     #382B1D;
+  --border-2:   #4E3C27;
+  --muted:      #65523C;
+  --dim:        #9A835F;
+  --body:       #DACBB2;
+  --heading:    #F6ECD9;
+  --amber:      #FFAE1F;
+  --amber-dim:  rgba(255, 174, 31, 0.13);
+  --vermillion:      #E5484D;
+  --vermillion-dim:  rgba(229, 72, 77, 0.12);
+  --green:      #9BC46B;
+  --green-dim:  rgba(155, 196, 107, 0.12);
+  --red:        #F07862;
+  --red-dim:    rgba(240, 120, 98, 0.12);
+  --tab-bar-bg: rgba(23, 17, 12, 0.92);
 }
 
 [data-theme="light"] {
-  --ink:        #F5F2EB;
-  --surface:    #FFFFFF;
-  --surface-2:  #EEE9DF;
-  --surface-3:  #E5DFD3;
-  --border:     #D9D2C5;
-  --border-2:   #C5BCAD;
-  --muted:      #9C9387;
-  --dim:        #6E6459;
-  --body:       #3A342C;
-  --heading:    #110F0B;
-  --amber:      #A06A00;
-  --amber-dim:  rgba(160, 106, 0, 0.12);
-  --green:      #047857;
-  --green-dim:  rgba(4, 120, 87, 0.10);
-  --red:        #B91C1C;
-  --red-dim:    rgba(185, 28, 28, 0.10);
-  --tab-bar-bg: rgba(245, 242, 235, 0.92);
+  --ink:        #F1E8D4;
+  --surface:    #FBF5E7;
+  --surface-2:  #EDE2CC;
+  --surface-3:  #E4D6B8;
+  --border:     #DECFAF;
+  --border-2:   #C6B18A;
+  --muted:      #A8946F;
+  --dim:        #77613F;
+  --body:       #453723;
+  --heading:    #221808;
+  --amber:      #A96D00;
+  --amber-dim:  rgba(169, 109, 0, 0.12);
+  --vermillion:      #B03A32;
+  --vermillion-dim:  rgba(176, 58, 50, 0.10);
+  --green:      #4F7A22;
+  --green-dim:  rgba(79, 122, 34, 0.10);
+  --red:        #B04329;
+  --red-dim:    rgba(176, 67, 41, 0.10);
+  --tab-bar-bg: rgba(241, 232, 212, 0.92);
 }
 
 /* ─── Base ──────────────────────────────────────────────────────── */
@@ -146,13 +155,13 @@ body::after {
 
 .btn-sm-settle {
   display: inline-flex; align-items: center;
-  background: var(--amber-dim); color: var(--amber);
+  background: var(--vermillion-dim); color: var(--vermillion);
   font-weight: 700; font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase;
   padding: 0.3125rem 0.75rem; border-radius: 6px;
-  border: 1px solid rgba(242, 160, 7, 0.18);
-  cursor: pointer; transition: background 0.15s; white-space: nowrap;
+  border: 1px solid var(--vermillion);
+  cursor: pointer; transition: filter 0.15s; white-space: nowrap;
 }
-.btn-sm-settle:hover { background: rgba(242, 160, 7, 0.22); }
+.btn-sm-settle:hover { filter: brightness(1.15); }
 .btn-sm-settle:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── Form Fields ───────────────────────────────────────────────── */
@@ -200,8 +209,9 @@ body::after {
 
 /* ─── Section Heading ───────────────────────────────────────────── */
 .section-title {
-  font-size: 1.5rem; font-weight: 600;
-  color: var(--heading); letter-spacing: -0.02em; line-height: 1.2;
+  font-family: var(--font-display), serif;
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--heading); letter-spacing: -0.01em; line-height: 1.2;
 }
 .section-sub { font-size: 0.8125rem; color: var(--dim); margin-top: 0.25rem; line-height: 1.5; }
 

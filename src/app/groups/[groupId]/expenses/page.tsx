@@ -33,7 +33,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['Food', 'Transport', 'Stay', 'Groceries', 'Activities', 'General', 'Others']
 const UNCATEGORIZED = 'Uncategorized'
-const ALL_CHIP_COLOR = '#F2A007'
+const ALL_CHIP_COLOR = '#FFAE1F'
 
 const catKey = (e: Expense) => {
     const c = e.category?.trim()
@@ -224,9 +224,9 @@ const ExpensesTab = () => {
                                             fontWeight: 600,
                                             border: 'none',
                                             cursor: 'pointer',
-                                            fontFamily: 'var(--font-jakarta), sans-serif',
+                                            fontFamily: 'var(--font-ui), sans-serif',
                                             background: viewMode === mode ? 'var(--amber)' : 'none',
-                                            color: viewMode === mode ? '#0B0B0B' : 'var(--dim)',
+                                            color: viewMode === mode ? 'var(--ink)' : 'var(--dim)',
                                             transition: 'background 0.15s, color 0.15s',
                                         }}
                                     >
@@ -269,7 +269,7 @@ const ExpensesTab = () => {
                                 color: 'var(--heading)',
                                 fontSize: '0.875rem',
                                 outline: 'none',
-                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                fontFamily: 'var(--font-ui), sans-serif',
                             }}
                         />
                     </div>

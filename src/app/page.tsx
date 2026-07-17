@@ -27,7 +27,7 @@ export default function Home() {
                     width: '600px',
                     height: '600px',
                     borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(242,160,7,0.05) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(255,174,31,0.07) 0%, transparent 70%)',
                     pointerEvents: 'none',
                 }}
             />
@@ -41,10 +41,10 @@ export default function Home() {
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
                     fontSize: 'clamp(280px, 40vw, 480px)',
-                    fontFamily: 'var(--font-cormorant), serif',
+                    fontFamily: 'var(--font-display), serif',
                     fontWeight: 700,
                     color: 'transparent',
-                    WebkitTextStroke: '1px rgba(242,160,7,0.04)',
+                    WebkitTextStroke: '1px rgba(255,174,31,0.06)',
                     lineHeight: 1,
                     userSelect: 'none',
                     pointerEvents: 'none',
@@ -70,14 +70,33 @@ export default function Home() {
                 {/* Wordmark */}
                 <div
                     className="anim-fade-up d-0"
-                    style={{ textAlign: 'center' }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem' }}
                 >
+                    <div
+                        aria-hidden
+                        style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '9px',
+                            background: 'var(--vermillion)',
+                            color: '#FFF6E6',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontFamily: 'var(--font-display), serif',
+                            fontWeight: 800,
+                            fontSize: '26px',
+                            transform: 'rotate(-5deg)',
+                            boxShadow: '0 6px 18px var(--vermillion-dim), inset 0 0 0 2px rgba(255,246,230,0.25)',
+                        }}
+                    >
+                        割
+                    </div>
                     <div
                         style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            marginBottom: '0.5rem',
                         }}
                     >
                         <span
@@ -101,20 +120,32 @@ export default function Home() {
                             Group Expense Tracker
                         </span>
                     </div>
-                    <h1
-                        style={{
-                            fontFamily: 'var(--font-cormorant), serif',
-                            fontSize: 'clamp(3.5rem, 12vw, 6rem)',
-                            fontWeight: 600,
-                            fontStyle: 'italic',
-                            color: 'var(--heading)',
-                            letterSpacing: '-0.03em',
-                            lineHeight: 0.9,
-                            margin: 0,
-                        }}
-                    >
-                        owe-wari
-                    </h1>
+                    <div style={{ textAlign: 'center' }}>
+                        <h1
+                            style={{
+                                fontFamily: 'var(--font-display), serif',
+                                fontSize: 'clamp(3.5rem, 12vw, 6rem)',
+                                fontWeight: 700,
+                                color: 'var(--heading)',
+                                letterSpacing: '-0.015em',
+                                lineHeight: 0.9,
+                                margin: 0,
+                            }}
+                        >
+                            owe-wari
+                        </h1>
+                        <div
+                            style={{
+                                fontSize: '0.8125rem',
+                                color: 'var(--dim)',
+                                marginTop: '0.625rem',
+                                letterSpacing: '0.5em',
+                                fontWeight: 500,
+                            }}
+                        >
+                            割り勘台帳
+                        </div>
+                    </div>
                 </div>
 
                 {/* Tagline */}
