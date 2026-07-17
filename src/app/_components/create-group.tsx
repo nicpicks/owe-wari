@@ -70,7 +70,7 @@ export default function CreateGroup() {
                         </div>
                         <div
                             className="section-title"
-                            style={{ marginBottom: '0.5rem', fontFamily: 'var(--font-cormorant), serif', fontSize: '2rem', fontStyle: 'italic' }}
+                            style={{ marginBottom: '0.5rem', fontFamily: 'var(--font-display), serif', fontSize: '2rem' }}
                         >
                             Group created!
                         </div>
@@ -135,9 +135,9 @@ export default function CreateGroup() {
                         </button>
                         <span
                             style={{
-                                fontFamily: 'var(--font-cormorant), serif',
+                                fontFamily: 'var(--font-display), serif',
                                 fontSize: '1.25rem',
-                                fontStyle: 'italic',
+                                fontWeight: 700,
                                 color: 'var(--heading)',
                             }}
                         >

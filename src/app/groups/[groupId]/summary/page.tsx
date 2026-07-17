@@ -84,7 +84,7 @@ const SummaryTab = () => {
                         <div className="section-sub" style={{ marginBottom: '0.5rem' }}>Total spent</div>
                         <div
                             style={{
-                                fontFamily: 'var(--font-cormorant), serif',
+                                fontFamily: 'var(--font-display), serif',
                                 fontSize: '2rem',
                                 fontWeight: 600,
                                 color: 'var(--heading)',
@@ -101,7 +101,7 @@ const SummaryTab = () => {
                                 key={currency}
                                 style={{
                                     marginTop: '0.375rem',
-                                    fontFamily: 'var(--font-cormorant), serif',
+                                    fontFamily: 'var(--font-display), serif',
                                     fontSize: '1.125rem',
                                     fontWeight: 600,
                                     color: 'var(--muted)',
@@ -117,7 +117,7 @@ const SummaryTab = () => {
                         <div className="section-sub" style={{ marginBottom: '0.5rem' }}>Outstanding</div>
                         <div
                             style={{
-                                fontFamily: 'var(--font-cormorant), serif',
+                                fontFamily: 'var(--font-display), serif',
                                 fontSize: '2rem',
                                 fontWeight: 600,
                                 color: totalOwedDefault && totalOwedDefault > 0 ? 'var(--red)' : 'var(--heading)',
@@ -134,7 +134,7 @@ const SummaryTab = () => {
                                 key={currency}
                                 style={{
                                     marginTop: '0.375rem',
-                                    fontFamily: 'var(--font-cormorant), serif',
+                                    fontFamily: 'var(--font-display), serif',
                                     fontSize: '1.125rem',
                                     fontWeight: 600,
                                     color: 'var(--red)',

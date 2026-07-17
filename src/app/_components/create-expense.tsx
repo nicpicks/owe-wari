@@ -392,7 +392,7 @@ export default function CreateExpense() {
                                 <path d="M11 4L6 9l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                         </button>
-                        <span style={{ fontFamily: 'var(--font-cormorant), serif', fontSize: '1.25rem', fontStyle: 'italic', color: 'var(--heading)' }}>
+                        <span style={{ fontFamily: 'var(--font-display), serif', fontSize: '1.25rem', fontWeight: 700, color: 'var(--heading)' }}>
                             Add expense
                         </span>
                     </div>
@@ -417,7 +417,7 @@ export default function CreateExpense() {
                                     background: 'none', border: '1px solid var(--border-2)',
                                     borderRadius: '6px', padding: '0.3125rem 0.625rem',
                                     color: scanReceipt.isPending ? 'var(--muted)' : 'var(--dim)',
-                                    fontSize: '0.75rem', fontFamily: 'var(--font-jakarta), sans-serif',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-ui), sans-serif',
                                     cursor: scanReceipt.isPending ? 'default' : 'pointer',
                                     transition: 'color 0.15s, border-color 0.15s',
                                 }}
@@ -586,7 +586,7 @@ export default function CreateExpense() {
                                                     fontSize: '0.7rem',
                                                     border: 'none',
                                                     cursor: 'pointer',
-                                                    fontFamily: 'var(--font-jakarta), sans-serif',
+                                                    fontFamily: 'var(--font-ui), sans-serif',
                                                     background: payMode === mode ? 'var(--surface-3)' : 'none',
                                                     color: payMode === mode ? 'var(--heading)' : 'var(--dim)',
                                                     transition: 'background 0.15s, color 0.15s',
@@ -680,7 +680,7 @@ export default function CreateExpense() {
                                         background: 'none', border: '1px solid var(--border-2)',
                                         borderRadius: '6px', padding: '0.3125rem 0.625rem',
                                         color: 'var(--dim)', fontSize: '0.75rem',
-                                        fontFamily: 'var(--font-jakarta), sans-serif',
+                                        fontFamily: 'var(--font-ui), sans-serif',
                                         cursor: 'pointer',
                                     }}
                                 >
@@ -706,7 +706,7 @@ export default function CreateExpense() {
                                                 borderRadius: '50%',
                                                 border: 'none',
                                                 cursor: 'pointer',
-                                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                                fontFamily: 'var(--font-ui), sans-serif',
                                                 fontSize: initials.length > 1 ? '0.5625rem' : '0.625rem',
                                                 fontWeight: 600,
                                                 display: 'flex',
@@ -715,7 +715,7 @@ export default function CreateExpense() {
                                                 flexShrink: 0,
                                                 transition: 'background 0.15s, color 0.15s',
                                                 background: included ? 'var(--amber)' : 'var(--surface-3)',
-                                                color: included ? '#0B0B0B' : 'var(--muted)',
+                                                color: included ? 'var(--ink)' : 'var(--muted)',
                                             }}
                                         >
                                             {initials}
@@ -748,7 +748,7 @@ export default function CreateExpense() {
                                                 fontSize: '0.875rem',
                                                 outline: 'none',
                                                 padding: '0.25rem 0',
-                                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                                fontFamily: 'var(--font-ui), sans-serif',
                                             }}
                                         />
                                         {/* Amount — fixed width, no spinners */}
@@ -790,7 +790,7 @@ export default function CreateExpense() {
                                                             borderRadius: '50%',
                                                             border: 'none',
                                                             cursor: 'pointer',
-                                                            fontFamily: 'var(--font-jakarta), sans-serif',
+                                                            fontFamily: 'var(--font-ui), sans-serif',
                                                             fontSize: initials.length > 1 ? '0.5625rem' : '0.625rem',
                                                             fontWeight: 600,
                                                             display: 'flex',
@@ -799,7 +799,7 @@ export default function CreateExpense() {
                                                             flexShrink: 0,
                                                             transition: 'background 0.15s, color 0.15s',
                                                             background: selected ? 'var(--amber)' : 'var(--surface-3)',
-                                                            color: selected ? '#0B0B0B' : 'var(--muted)',
+                                                            color: selected ? 'var(--ink)' : 'var(--muted)',
                                                         }}
                                                     >
                                                         {initials}
@@ -835,7 +835,7 @@ export default function CreateExpense() {
                                     marginTop: '0.5rem',
                                     background: 'none', border: 'none',
                                     color: 'var(--dim)', cursor: 'pointer',
-                                    fontSize: '0.75rem', fontFamily: 'var(--font-jakarta), sans-serif',
+                                    fontSize: '0.75rem', fontFamily: 'var(--font-ui), sans-serif',
                                     padding: '0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.25rem',
                                 }}
                             >
@@ -885,7 +885,7 @@ export default function CreateExpense() {
                                                 fontSize: '0.75rem',
                                                 border: 'none',
                                                 cursor: 'pointer',
-                                                fontFamily: 'var(--font-jakarta), sans-serif',
+                                                fontFamily: 'var(--font-ui), sans-serif',
                                                 background: splitMode === key ? 'var(--surface-3)' : 'none',
                                                 color: splitMode === key ? 'var(--heading)' : 'var(--dim)',
                                                 transition: 'background 0.15s, color 0.15s',
