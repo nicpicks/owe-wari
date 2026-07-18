@@ -79,6 +79,7 @@ export function ExpenseDetailModal({ expenseId, seed, groupId, onClose }: Expens
 
     const [isEditing, setIsEditing] = useState(false)
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+    const [menuOpen, setMenuOpen] = useState(false)
     const [title, setTitle] = useState('')
     const [amount, setAmount] = useState(0)
     const [category, setCategory] = useState('General')
@@ -109,6 +110,7 @@ export function ExpenseDetailModal({ expenseId, seed, groupId, onClose }: Expens
         if (expenseId === null) {
             setIsEditing(false)
             setIsConfirmingDelete(false)
+            setMenuOpen(false)
         }
     }, [expenseId])
 
@@ -178,73 +180,112 @@ export function ExpenseDetailModal({ expenseId, seed, groupId, onClose }: Expens
                 className="card-dark modal-card relative mx-4 flex max-h-[90vh] w-full max-w-md flex-col overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="mb-4 flex items-start justify-between gap-2">
+                {/* Header: glyph + actions on the top row, full-width title below
+                    so long titles wrap across the whole modal. */}
+                <div className="mb-4">
+                    <div className="flex items-center justify-between gap-2" style={{ marginBottom: '0.75rem' }}>
+                        <div
+                            className="glyph-tile"
+                            style={{
+                                width: '38px',
+                                height: '38px',
+                                fontSize: '1.0625rem',
+                                background: `${categoryColor}18`,
+                                border: `1px solid ${categoryColor}30`,
+                                color: categoryColor,
+                            }}
+                        >
+                            {categoryGlyph(detail?.category)}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, position: 'relative' }}>
+                            {!isEditing && !isConfirmingDelete && expense && (
+                                <button
+                                    onClick={() => setMenuOpen((o) => !o)}
+                                    className="btn-ghost text-xl leading-none"
+                                    aria-label="More actions"
+                                    aria-haspopup="menu"
+                                    aria-expanded={menuOpen}
+                                >
+                                    ⋯
+                                </button>
+                            )}
+                            <button
+                                onClick={onClose}
+                                className="btn-ghost text-xl leading-none"
+                                aria-label="Close"
+                            >
+                                ×
+                            </button>
+                            {menuOpen && (
+                                <>
+                                    {/* click-away catcher; inside modal-card so it can't close the modal */}
+                                    <div
+                                        style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+                                        onClick={() => setMenuOpen(false)}
+                                    />
+                                    <div
+                                        role="menu"
+                                        className="card-dark"
+                                        style={{
+                                            position: 'absolute',
+                                            top: 'calc(100% + 0.375rem)',
+                                            right: 0,
+                                            zIndex: 11,
+                                            minWidth: '150px',
+                                            padding: '0.375rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.125rem',
+                                            boxShadow: '0 10px 28px rgba(0, 0, 0, 0.45)',
+                                        }}
+                                    >
+                                        <button
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setMenuOpen(false)
+                                                setIsEditing(true)
+                                            }}
+                                            className="btn-ghost text-sm"
+                                            style={{ justifyContent: 'flex-start' }}
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setMenuOpen(false)
+                                                setIsConfirmingDelete(true)
+                                            }}
+                                            className="btn-ghost text-sm"
+                                            style={{ justifyContent: 'flex-start', color: 'var(--red)' }}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
                     {isEditing ? (
                         <input
                             className="field-input"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            style={{ flex: 1, fontSize: '1rem', fontWeight: 600 }}
+                            style={{ width: '100%', fontSize: '1rem', fontWeight: 600 }}
                         />
                     ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6875rem', flex: 1, minWidth: 0 }}>
-                            <div
-                                className="glyph-tile"
-                                style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    fontSize: '1.0625rem',
-                                    background: `${categoryColor}18`,
-                                    border: `1px solid ${categoryColor}30`,
-                                    color: categoryColor,
-                                }}
-                            >
-                                {categoryGlyph(detail?.category)}
-                            </div>
-                            <h2
-                                className="text-lg font-semibold"
-                                style={{
-                                    color: 'var(--heading)',
-                                    fontFamily: 'var(--font-display), serif',
-                                    flex: 1,
-                                    minWidth: 0,
-                                    overflowWrap: 'anywhere',
-                                    lineHeight: 1.25,
-                                }}
-                            >
-                                {detail ? detail.title : 'Loading…'}
-                            </h2>
-                        </div>
-                    )}
-                    <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                        {!isEditing && !isConfirmingDelete && expense && (
-                            <>
-                                <button
-                                    onClick={() => setIsEditing(true)}
-                                    className="btn-ghost text-sm"
-                                    aria-label="Edit"
-                                >
-                                    Edit
-                                </button>
-                                <button
-                                    onClick={() => setIsConfirmingDelete(true)}
-                                    className="btn-ghost text-sm"
-                                    style={{ color: 'var(--red)' }}
-                                    aria-label="Delete"
-                                >
-                                    Delete
-                                </button>
-                            </>
-                        )}
-                        <button
-                            onClick={onClose}
-                            className="btn-ghost text-xl leading-none"
-                            aria-label="Close"
+                        <h2
+                            className="text-lg font-semibold"
+                            style={{
+                                color: 'var(--heading)',
+                                fontFamily: 'var(--font-display), serif',
+                                overflowWrap: 'break-word',
+                                lineHeight: 1.3,
+                            }}
                         >
-                            ×
-                        </button>
-                    </div>
+                            {detail ? detail.title : 'Loading…'}
+                        </h2>
+                    )}
                 </div>
 
                 {/* Delete confirmation */}
