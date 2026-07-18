@@ -54,22 +54,10 @@ export default function SettleUpModal({
     if (!open) return null
 
     return (
-        <div
-            onClick={onClose}
-            style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 50,
-                padding: '1rem',
-            }}
-        >
+        <div className="modal-overlay" onClick={onClose}>
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="card-dark"
+                className="card-dark modal-card"
                 style={{ width: '100%', maxWidth: '420px', padding: '1.5rem' }}
             >
                 <div className="section-title" style={{ marginBottom: '0.25rem' }}>
@@ -158,7 +146,7 @@ export default function SettleUpModal({
                         disabled={isSubmitting}
                         onClick={() => onConfirm(lines)}
                     >
-                        {isSubmitting ? 'Settling…' : 'Confirm'}
+                        {isSubmitting ? 'Settling…' : '済 Confirm'}
                     </button>
                 </div>
             </div>

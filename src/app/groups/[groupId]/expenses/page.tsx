@@ -8,6 +8,7 @@ import { ExpenseDetailModal } from '~/app/_components/expense-detail-modal'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
 import { useGroupIdentity } from '~/app/_components/use-group-identity'
+import { categoryGlyph } from '~/lib/category-glyphs'
 
 interface Expense {
     id: number
@@ -406,26 +407,17 @@ const ExpensesTab = () => {
                                                             {/* Category dot + info */}
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
                                                                 <div
+                                                                    className="glyph-tile"
                                                                     style={{
-                                                                        width: '32px',
-                                                                        height: '32px',
-                                                                        borderRadius: '8px',
+                                                                        width: '36px',
+                                                                        height: '36px',
+                                                                        fontSize: '1.0625rem',
                                                                         background: `${catColor}18`,
                                                                         border: `1px solid ${catColor}30`,
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        flexShrink: 0,
+                                                                        color: catColor,
                                                                     }}
                                                                 >
-                                                                    <div
-                                                                        style={{
-                                                                            width: '6px',
-                                                                            height: '6px',
-                                                                            borderRadius: '50%',
-                                                                            background: catColor,
-                                                                        }}
-                                                                    />
+                                                                    {categoryGlyph(expense.category)}
                                                                 </div>
                                                                 <div style={{ minWidth: 0 }}>
                                                                     <div
