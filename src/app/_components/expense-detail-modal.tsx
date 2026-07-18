@@ -174,7 +174,17 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                             >
                                 {categoryGlyph(expense?.category)}
                             </div>
-                            <h2 className="text-lg font-semibold" style={{ color: 'var(--heading)', fontFamily: 'var(--font-display), serif' }}>
+                            <h2
+                                className="text-lg font-semibold"
+                                style={{
+                                    color: 'var(--heading)',
+                                    fontFamily: 'var(--font-display), serif',
+                                    flex: 1,
+                                    minWidth: 0,
+                                    overflowWrap: 'anywhere',
+                                    lineHeight: 1.25,
+                                }}
+                            >
                                 {isLoading ? 'Loading…' : expense?.title}
                             </h2>
                         </div>
