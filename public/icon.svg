@@ -1,10 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  
-  <circle cx="256" cy="256" r="256" fill="#0B0B0B"></circle>
-  
-  <text x="256" y="310" font-family="Georgia, &#39;Times New Roman&#39;, serif" font-size="190" font-weight="700" letter-spacing="-10" fill="#F2A007" text-anchor="middle" dominant-baseline="auto">OW</text>
-  
-  <line x1="140" y1="345" x2="372" y2="345" stroke="#F2A007" stroke-width="7" stroke-linecap="round"></line>
-  
-  <circle cx="256" cy="378" r="9" fill="#F2A007"></circle>
+  <defs>
+    <radialGradient id="seal" cx="50%" cy="38%" r="80%">
+      <stop offset="0%" stop-color="#D4524E"/>
+      <stop offset="70%" stop-color="#C13B36"/>
+      <stop offset="100%" stop-color="#A93029"/>
+    </radialGradient>
+    <pattern id="washi" width="14" height="14" patternTransform="rotate(105)" patternUnits="userSpaceOnUse">
+      <rect width="14" height="14" fill="#F1E8D4"/>
+      <rect width="4" height="14" fill="rgba(150,110,50,0.06)"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="url(#washi)"/>
+  <g transform="rotate(-4 256 256)">
+    <rect x="96" y="106" width="320" height="320" rx="72" fill="#8E2723" opacity="0.35"/>
+    <rect x="96" y="96" width="320" height="320" rx="72" fill="url(#seal)"/>
+    <rect x="108" y="108" width="296" height="296" rx="62" fill="none" stroke="rgba(255,246,230,0.22)" stroke-width="6"/>
+    <text x="256" y="336" font-family="'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif" font-size="230" font-weight="800" fill="#FFF6E6" text-anchor="middle">割</text>
+  </g>
 </svg>
