@@ -2,6 +2,73 @@ import Link from 'next/link'
 import { RecentGroupsList } from './groups/recent-groups-list'
 import { ClipboardGroupOpener } from './_components/clipboard-group-opener'
 
+/* Paper lantern — cord, caps, glowing ribbed body with a kanji, tassel */
+const Lantern = ({
+    kanji,
+    size,
+    cordHeight,
+    side,
+    offset,
+    duration,
+    delay,
+    opacity = 1,
+}: {
+    kanji: string
+    size: number
+    cordHeight: number
+    side: 'left' | 'right'
+    offset: string
+    duration: string
+    delay?: string
+    opacity?: number
+}) => (
+    <div
+        aria-hidden
+        style={{
+            position: 'absolute',
+            top: 0,
+            [side]: offset,
+            zIndex: 0,
+            transformOrigin: '50% 0',
+            animation: `sway ${duration} ease-in-out ${delay ?? '0s'} infinite`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            pointerEvents: 'none',
+            opacity,
+        }}
+    >
+        <div style={{ width: '2px', height: `${cordHeight}px`, background: 'var(--border-2)' }} />
+        <div style={{ width: `${size * 0.45}px`, height: '7px', background: '#3A2B1A', borderRadius: '3px' }} />
+        <div
+            style={{
+                width: `${size}px`,
+                height: `${size * 1.2}px`,
+                borderRadius: '50% / 42%',
+                background:
+                    'repeating-linear-gradient(to bottom, rgba(0,0,0,0.16) 0 2px, transparent 2px 9px), radial-gradient(circle at 50% 35%, #FFC85C, var(--amber) 72%)',
+                boxShadow: '0 0 48px 8px var(--amber-dim)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
+            <span
+                style={{
+                    fontFamily: 'var(--font-display), serif',
+                    fontWeight: 800,
+                    color: 'rgba(64,32,4,0.55)',
+                    fontSize: `${size * 0.4}px`,
+                }}
+            >
+                {kanji}
+            </span>
+        </div>
+        <div style={{ width: `${size * 0.38}px`, height: '6px', background: '#3A2B1A', borderRadius: '3px' }} />
+        <div style={{ width: '2px', height: `${size * 0.26}px`, background: 'var(--vermillion)' }} />
+    </div>
+)
+
 export default function Home() {
     return (
         <main
@@ -49,10 +116,15 @@ export default function Home() {
                     userSelect: 'none',
                     pointerEvents: 'none',
                     letterSpacing: '-0.04em',
+                    animation: 'flicker 6s ease-in-out infinite',
                 }}
             >
                 割
             </div>
+
+            {/* Hanging paper lanterns */}
+            <Lantern kanji="割" size={58} cordHeight={52} side="right" offset="clamp(24px, 8vw, 120px)" duration="5.5s" />
+            <Lantern kanji="酒" size={40} cordHeight={26} side="left" offset="clamp(20px, 7vw, 100px)" duration="6.5s" delay="-2.6s" opacity={0.85} />
 
             {/* Content */}
             <div

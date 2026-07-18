@@ -28,6 +28,7 @@
   --red:        #F07862;
   --red-dim:    rgba(240, 120, 98, 0.12);
   --tab-bar-bg: rgba(23, 17, 12, 0.92);
+  --paper: radial-gradient(ellipse 90% 40% at 50% 0%, rgba(255, 174, 31, 0.05), transparent 60%), #17110C;
 }
 
 [data-theme="light"] {
@@ -50,6 +51,10 @@
   --red:        #B04329;
   --red-dim:    rgba(176, 67, 41, 0.10);
   --tab-bar-bg: rgba(241, 232, 212, 0.92);
+  --paper: radial-gradient(circle at 15% 25%, rgba(193, 59, 54, 0.04), transparent 45%),
+           radial-gradient(circle at 85% 75%, rgba(180, 112, 10, 0.06), transparent 45%),
+           repeating-linear-gradient(105deg, rgba(150, 110, 50, 0.028) 0 2px, transparent 2px 7px),
+           #F1E8D4;
 }
 
 /* ─── Base ──────────────────────────────────────────────────────── */
@@ -61,7 +66,8 @@ html {
 }
 
 body {
-  background: var(--ink);
+  background: var(--paper);
+  background-attachment: fixed;
   color: var(--body);
   min-height: 100dvh;
 }
@@ -263,6 +269,26 @@ body::after {
   to { transform: rotate(360deg); }
 }
 
+@keyframes flicker {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.85; }
+}
+@keyframes sway {
+  0%, 100% { transform: rotate(-3deg); }
+  50%      { transform: rotate(3.5deg); }
+}
+@keyframes stampIn {
+  from { opacity: 0; transform: rotate(-14deg) scale(1.8); }
+  to   { opacity: 1; transform: rotate(-8deg) scale(1); }
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes growBar {
+  from { width: 0%; }
+}
+
 .anim-fade-up { animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-fade-in { animation: fadeIn 0.4s ease both; }
 
@@ -275,3 +301,52 @@ body::after {
 .d-6 { animation-delay: 0.36s; }
 .d-7 { animation-delay: 0.42s; }
 .d-8 { animation-delay: 0.48s; }
+
+/* ─── Modal / Bottom Sheet ──────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(10, 6, 3, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.25s ease both;
+}
+.modal-card { animation: fadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (max-width: 640px) {
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-card {
+    width: 100% !important; max-width: none !important; margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-bottom: none !important;
+    box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.4);
+    max-height: 85dvh; overflow-y: auto;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom)) !important;
+    animation: sheetUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .modal-card::before {
+    content: ''; display: block;
+    width: 36px; height: 4px; border-radius: 99px;
+    background: var(--border-2);
+    margin: 0 auto 0.875rem;
+  }
+}
+
+/* ─── Hanko Stamp Seal (済) ─────────────────────────────────────── */
+.stamp-seal {
+  width: 40px; height: 40px; border-radius: 8px;
+  border: 2px solid var(--vermillion); color: var(--vermillion);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display), serif;
+  font-weight: 800; font-size: 1.25rem; flex-shrink: 0;
+  animation: stampIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Kanji Glyph Tile ──────────────────────────────────────────── */
+.glyph-tile {
+  border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display), serif;
+  color: var(--amber); flex-shrink: 0;
+}

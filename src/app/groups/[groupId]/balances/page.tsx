@@ -37,9 +37,26 @@ const BalancesTab = () => {
     const defaultCurrency = group?.currency ?? 'SGD'
 
     const [pending, setPending] = useState<PendingSettle | null>(null)
+    // Pairs settled during this visit — kept on screen, dimmed, with a 済 stamp
+    const [justSettled, setJustSettled] = useState<
+        { key: string; fromName: string; toName: string; amountStr: string }[]
+    >([])
 
     const settleUp = api.expense.settleUp.useMutation({
-        onSuccess: async () => {
+        onSuccess: async (_data, vars) => {
+            if (pending) {
+                setJustSettled((prev) => [
+                    ...prev,
+                    {
+                        key: `${vars.payerId}|${vars.receiverId}`,
+                        fromName: pending.fromName,
+                        toName: pending.toName,
+                        amountStr: vars.lines
+                            .map((l) => formatAmount(l.amount, l.currency))
+                            .join(' + '),
+                    },
+                ])
+            }
             await utils.expense.getBalances.invalidate({ groupId })
             setPending(null)
         },
@@ -69,6 +86,7 @@ const BalancesTab = () => {
     }, [balances])
 
     const allTransferKeys = Array.from(transfersByPair.keys())
+    const stampedRows = justSettled.filter((s) => !transfersByPair.has(s.key))
 
     return (
         <div className="page-shell">
@@ -87,7 +105,7 @@ const BalancesTab = () => {
                                     ? 'Could not load — try refreshing'
                                     : allTransferKeys.length === 0
                                         ? 'Everyone is all square'
-                                        : `${allTransferKeys.length} pair${allTransferKeys.length !== 1 ? 's' : ''} to settle`}
+                                        : `${allTransferKeys.length} pair${allTransferKeys.length !== 1 ? 's' : ''} to settle · tap to stamp it paid`}
                         </div>
                     </div>
 
@@ -130,6 +148,23 @@ const BalancesTab = () => {
                             </div>
                         )
                     })}
+
+                    {/* Freshly settled pairs — dimmed with a hanko stamp */}
+                    {stampedRows.map((s) => (
+                        <div key={s.key} className="ledger-row" style={{ opacity: 0.45, transition: 'opacity 0.35s' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '0.9375rem', color: 'var(--body)', display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{s.fromName}</span>
+                                    <span style={{ color: 'var(--muted)', fontSize: '0.8125rem' }}>→</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{s.toName}</span>
+                                </div>
+                                <div className="font-mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)', marginTop: '0.125rem' }}>
+                                    {s.amountStr}
+                                </div>
+                            </div>
+                            <div className="stamp-seal" aria-label="Settled">済</div>
+                        </div>
+                    ))}
                 </div>
             </div>
 

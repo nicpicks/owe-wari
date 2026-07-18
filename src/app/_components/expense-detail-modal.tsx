@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
 import { useGroupIdentity } from './use-group-identity'
+import { categoryGlyph } from '~/lib/category-glyphs'
 
 const CATEGORIES = ['General', 'Food', 'Transport', 'Stay', 'Groceries', 'Activities', 'Others'] as const
 
@@ -144,12 +145,9 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     }
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            onClick={onClose}
-        >
+        <div className="modal-overlay" onClick={onClose}>
             <div
-                className="card-dark relative mx-4 flex max-h-[90vh] w-full max-w-md flex-col overflow-y-auto"
+                className="card-dark modal-card relative mx-4 flex max-h-[90vh] w-full max-w-md flex-col overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -162,9 +160,24 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                             style={{ flex: 1, fontSize: '1rem', fontWeight: 600 }}
                         />
                     ) : (
-                        <h2 className="text-lg font-semibold" style={{ color: 'var(--heading)', flex: 1 }}>
-                            {isLoading ? 'Loading…' : expense?.title}
-                        </h2>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6875rem', flex: 1, minWidth: 0 }}>
+                            <div
+                                className="glyph-tile"
+                                style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    fontSize: '1.0625rem',
+                                    background: `${categoryColor}18`,
+                                    border: `1px solid ${categoryColor}30`,
+                                    color: categoryColor,
+                                }}
+                            >
+                                {categoryGlyph(expense?.category)}
+                            </div>
+                            <h2 className="text-lg font-semibold" style={{ color: 'var(--heading)', fontFamily: 'var(--font-display), serif' }}>
+                                {isLoading ? 'Loading…' : expense?.title}
+                            </h2>
+                        </div>
                     )}
                     <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
                         {!isEditing && !isConfirmingDelete && expense && (

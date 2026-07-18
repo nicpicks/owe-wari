@@ -5,6 +5,7 @@ import Tabs from '~/app/_components/tabs'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
 import { useGroupIdentity } from '~/app/_components/use-group-identity'
+import { useCountUp } from '~/app/_components/use-count-up'
 
 const SummaryTab = () => {
     const router = useRouter()
@@ -38,6 +39,9 @@ const SummaryTab = () => {
     const identityName = usersData?.find((u) => u.id === identity)?.name
 
     const defaultCurrency = totals?.defaultCurrency ?? 'SGD'
+
+    // Count-up progress restarts when data arrives
+    const countP = useCountUp(totals && balances ? 'loaded' : 'loading')
 
     const totalOwedDefault = balances
         ? balances
@@ -74,7 +78,27 @@ const SummaryTab = () => {
         <div className="page-shell">
             <Tabs pathname={pathname} navigateToTab={navigateToTab} />
 
-            <div className="page-container" style={{ paddingTop: '2rem', paddingBottom: '3rem' }}>
+            <div className="page-container" style={{ paddingTop: '2rem', paddingBottom: '3rem', position: 'relative' }}>
+                {/* Decorative vertical kanji — 勘定台帳 (ledger of accounts) */}
+                <div
+                    aria-hidden
+                    style={{
+                        position: 'absolute',
+                        top: '200px',
+                        right: '2px',
+                        writingMode: 'vertical-rl',
+                        fontFamily: 'var(--font-display), serif',
+                        fontSize: '0.875rem',
+                        letterSpacing: '0.4em',
+                        color: 'var(--muted)',
+                        opacity: 0.35,
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                        zIndex: 0,
+                    }}
+                >
+                    勘定台帳
+                </div>
                 {/* Stats row */}
                 <div
                     className="anim-fade-up d-0"
@@ -93,7 +117,7 @@ const SummaryTab = () => {
                             }}
                         >
                             {totals
-                                ? formatAmount(totals.defaultTotal, totals.defaultCurrency)
+                                ? formatAmount(totals.defaultTotal * countP, totals.defaultCurrency)
                                 : '—'}
                         </div>
                         {totals && totals.otherTotals.map(({ currency, total }) => (
@@ -109,11 +133,25 @@ const SummaryTab = () => {
                                     lineHeight: 1,
                                 }}
                             >
-                                {formatAmount(total, currency)}
+                                {formatAmount(total * countP, currency)}
                             </div>
                         ))}
                     </div>
-                    <div className="card-dark" style={{ padding: '1.25rem' }}>
+                    <div className="card-dark" style={{ padding: '1.25rem', position: 'relative', overflow: 'hidden' }}>
+                        {/* Vermillion corner glow */}
+                        <div
+                            aria-hidden
+                            style={{
+                                position: 'absolute',
+                                top: '-30px',
+                                right: '-30px',
+                                width: '100px',
+                                height: '100px',
+                                borderRadius: '50%',
+                                background: 'radial-gradient(circle, var(--vermillion-dim), transparent 70%)',
+                                pointerEvents: 'none',
+                            }}
+                        />
                         <div className="section-sub" style={{ marginBottom: '0.5rem' }}>Outstanding</div>
                         <div
                             style={{
@@ -126,7 +164,7 @@ const SummaryTab = () => {
                             }}
                         >
                             {totalOwedDefault != null
-                                ? formatAmount(totalOwedDefault, defaultCurrency)
+                                ? formatAmount(totalOwedDefault * countP, defaultCurrency)
                                 : '—'}
                         </div>
                         {otherCurrenciesOutstanding.map(({ currency, total }) => (
@@ -143,11 +181,37 @@ const SummaryTab = () => {
                                     lineHeight: 1,
                                 }}
                             >
-                                {formatAmount(total, currency)}
+                                {formatAmount(total * countP, currency)}
                             </div>
                         ))}
                     </div>
                 </div>
+
+                {/* Settled so far — share of the default-currency total no longer outstanding */}
+                {totals && totalOwedDefault != null && totals.defaultTotal > 0 && (
+                    <div className="card-dark anim-fade-up d-1" style={{ padding: '0.875rem 1rem 0.8125rem', marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.5625rem' }}>
+                            <span style={{ fontSize: '0.625rem', fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                                Settled so far
+                            </span>
+                            <span className="font-mono" style={{ fontSize: '0.71875rem', color: 'var(--amber)', fontWeight: 600 }}>
+                                {Math.round(Math.max(0, Math.min(1, 1 - totalOwedDefault / totals.defaultTotal)) * 100)}%
+                            </span>
+                        </div>
+                        <div style={{ height: '6px', borderRadius: '99px', background: 'var(--surface-2)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                            <div
+                                style={{
+                                    height: '100%',
+                                    width: `${Math.max(0, Math.min(1, 1 - totalOwedDefault / totals.defaultTotal)) * 100}%`,
+                                    borderRadius: '99px',
+                                    background: 'linear-gradient(90deg, var(--amber), #FFC85C)',
+                                    boxShadow: '0 0 10px var(--amber-dim)',
+                                    animation: 'growBar 1.1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both',
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {/* Your spend — only when identity is set */}
                 {identity && userSpend && userSpend.byCurrency.length > 0 && (
