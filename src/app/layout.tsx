@@ -27,8 +27,8 @@ export const metadata = {
         title: 'owe-wari',
     },
     icons: [
-        { rel: 'icon', url: '/favicon.ico' },
-        { rel: 'apple-touch-icon', url: '/icons/apple-touch-icon.png' },
+        { rel: 'icon', url: '/favicon.ico?v=2' },
+        { rel: 'apple-touch-icon', url: '/icons/apple-touch-icon-v2.png' },
     ],
 }
 
