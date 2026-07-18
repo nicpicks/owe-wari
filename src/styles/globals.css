@@ -203,7 +203,7 @@ body::after {
 /* ─── Ledger Rows ───────────────────────────────────────────────── */
 .ledger-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.8125rem 0; border-bottom: 1px solid var(--border);
+  padding: 0.8125rem 0; border-bottom: 1px dashed var(--border);
 }
 .ledger-row:last-child { border-bottom: none; }
 
@@ -218,7 +218,7 @@ body::after {
 /* ─── Checkbox Row ──────────────────────────────────────────────── */
 .check-row {
   display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.625rem 0; border-bottom: 1px solid var(--border); cursor: pointer;
+  padding: 0.625rem 0; border-bottom: 1px dashed var(--border); cursor: pointer;
 }
 .check-row:last-child { border-bottom: none; }
 .check-row input[type='checkbox'] {

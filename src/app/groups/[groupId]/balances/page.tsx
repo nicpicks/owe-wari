@@ -125,7 +125,7 @@ const BalancesTab = () => {
                                         })
                                     }
                                 >
-                                    Settle
+                                    済 Settle
                                 </button>
                             </div>
                         )

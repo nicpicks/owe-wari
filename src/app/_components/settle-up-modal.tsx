@@ -158,7 +158,7 @@ export default function SettleUpModal({
                         disabled={isSubmitting}
                         onClick={() => onConfirm(lines)}
                     >
-                        {isSubmitting ? 'Settling…' : 'Confirm'}
+                        {isSubmitting ? 'Settling…' : '済 Confirm'}
                     </button>
                 </div>
             </div>
