@@ -289,6 +289,16 @@ body::after {
   from { width: 0%; }
 }
 
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.9; }
+}
+.skeleton-block {
+  background: var(--surface-2);
+  border-radius: 8px;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+}
+
 .anim-fade-up { animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .anim-fade-in { animation: fadeIn 0.4s ease both; }
 

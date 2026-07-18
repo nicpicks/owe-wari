@@ -153,10 +153,30 @@ export const expenseRouter = createTRPCRouter({
         }),
 
     getExpenses: publicProcedure
-        .input(z.object({ groupId: z.string() }))
+        .input(
+            z.object({
+                groupId: z.string(),
+                // Optional cursor pagination (keyset on expenseDate desc, id desc).
+                // Omitting limit returns the full list, preserving existing callers.
+                limit: z.number().int().min(1).max(200).optional(),
+                cursor: z.object({ expenseDate: z.date(), id: z.number() }).nullish(),
+            })
+        )
         .query(async ({ ctx, input }) => {
             try {
-                const expensesInGroup = await ctx.db
+                // Order/compare expenseDate at millisecond precision: Postgres stores
+                // microseconds but JS Dates only carry milliseconds, so a cursor built
+                // client-side would otherwise skip rows that tie at the page boundary.
+                const expenseDateMs = sql`date_trunc('milliseconds', ${expenses.expenseDate})`
+
+                const conditions = [eq(expenses.groupId, input.groupId), notDeleted]
+                if (input.cursor) {
+                    conditions.push(
+                        sql`(${expenseDateMs}, ${expenses.id}) < (${input.cursor.expenseDate.toISOString()}::timestamptz, ${input.cursor.id})`
+                    )
+                }
+
+                const query = ctx.db
                     .select({
                         id: expenses.id,
                         title: expenses.title,
@@ -170,10 +190,13 @@ export const expenseRouter = createTRPCRouter({
                     })
                     .from(expenses)
                     .leftJoin(expenseSplits, eq(expenseSplits.expenseId, expenses.id))
-                    .where(and(eq(expenses.groupId, input.groupId), notDeleted))
+                    .where(and(...conditions))
                     .groupBy(expenses.id)
-                    .orderBy(desc(expenses.expenseDate), desc(expenses.id))
-                    .execute()
+                    .orderBy(sql`${expenseDateMs} desc`, desc(expenses.id))
+
+                const expensesInGroup = input.limit
+                    ? await query.limit(input.limit).execute()
+                    : await query.execute()
 
                 return expensesInGroup
             } catch (error) {
@@ -295,26 +318,23 @@ export const expenseRouter = createTRPCRouter({
         .input(z.object({ expenseId: z.number() }))
         .query(async ({ ctx, input }) => {
             try {
-                const [expense] = await ctx.db
-                    .select({
-                        id: expenses.id,
-                        title: expenses.title,
-                        amount: expenses.amount,
-                        currency: expenses.currency,
-                        category: expenses.category,
-                        notes: expenses.notes,
-                        expenseDate: expenses.expenseDate,
-                        paidByUserId: expenses.paidByUserId,
-                        paidByName: users.name,
-                    })
-                    .from(expenses)
-                    .innerJoin(users, eq(users.id, expenses.paidByUserId))
-                    .where(and(eq(expenses.id, input.expenseId), notDeleted))
-                    .execute()
-
-                if (!expense) throw new Error('Expense not found')
-
-                const [splits, payments] = await Promise.all([
+                const [[expense], splits, payments] = await Promise.all([
+                    ctx.db
+                        .select({
+                            id: expenses.id,
+                            title: expenses.title,
+                            amount: expenses.amount,
+                            currency: expenses.currency,
+                            category: expenses.category,
+                            notes: expenses.notes,
+                            expenseDate: expenses.expenseDate,
+                            paidByUserId: expenses.paidByUserId,
+                            paidByName: users.name,
+                        })
+                        .from(expenses)
+                        .innerJoin(users, eq(users.id, expenses.paidByUserId))
+                        .where(and(eq(expenses.id, input.expenseId), notDeleted))
+                        .execute(),
                     ctx.db
                         .select({
                             userId: expenseSplits.userId,
@@ -336,6 +356,8 @@ export const expenseRouter = createTRPCRouter({
                         .where(eq(expensePayments.expenseId, input.expenseId))
                         .execute(),
                 ])
+
+                if (!expense) throw new Error('Expense not found')
 
                 return { ...expense, splits, payments }
             } catch (error) {

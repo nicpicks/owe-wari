@@ -31,13 +31,28 @@ function toDateInput(date: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Summary row shape from the expenses list — used to paint the modal instantly
+// while the full detail (payer name, splits, payments) loads.
+export interface Expense {
+    id: number
+    title: string
+    amount: string
+    currency: string
+    category: string | null
+    notes: string | null
+    expenseDate: Date
+    paidByUserId: string
+    participantIds: string[]
+}
+
 interface ExpenseDetailModalProps {
     expenseId: number | null
+    seed?: Expense | null
     groupId: string
     onClose: () => void
 }
 
-export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetailModalProps) {
+export function ExpenseDetailModal({ expenseId, seed, groupId, onClose }: ExpenseDetailModalProps) {
     const utils = api.useUtils()
     const { identity } = useGroupIdentity(groupId)
     const { data: expense, isLoading } = api.expense.getExpense.useQuery(
@@ -48,6 +63,19 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
         { groupId },
         { enabled: !!groupId }
     )
+
+    // What we render: the full record once fetched, otherwise the list-row seed
+    // (splits/payments unknown until the fetch lands).
+    const detail =
+        expense ??
+        (seed && seed.id === expenseId
+            ? {
+                  ...seed,
+                  paidByName: groupUsers?.find((u) => u.id === seed.paidByUserId)?.name ?? '…',
+                  splits: null,
+                  payments: null,
+              }
+            : null)
 
     const [isEditing, setIsEditing] = useState(false)
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
@@ -117,7 +145,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
     if (expenseId === null) return null
 
     const categoryColor =
-        expense?.category ? (CATEGORY_COLORS[expense.category] ?? '#717181') : '#717181'
+        detail?.category ? (CATEGORY_COLORS[detail.category] ?? '#717181') : '#717181'
 
     const handleSave = () => {
         if (!expense) return
@@ -172,10 +200,10 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                     color: categoryColor,
                                 }}
                             >
-                                {categoryGlyph(expense?.category)}
+                                {categoryGlyph(detail?.category)}
                             </div>
                             <h2 className="text-lg font-semibold" style={{ color: 'var(--heading)', fontFamily: 'var(--font-display), serif' }}>
-                                {isLoading ? 'Loading…' : expense?.title}
+                                {detail ? detail.title : 'Loading…'}
                             </h2>
                         </div>
                     )}
@@ -261,13 +289,13 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                     </div>
                 )}
 
-                {isLoading && (
+                {isLoading && !detail && (
                     <p style={{ color: 'var(--muted)' }} className="text-sm">
                         Loading expense details…
                     </p>
                 )}
 
-                {expense && (
+                {detail && (
                     <>
                         {/* Expense Details Card */}
                         <div className="card-dark mb-4 space-y-3">
@@ -291,7 +319,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                     />
                                 ) : (
                                     <span className="font-mono text-lg font-semibold" style={{ color: 'var(--heading)' }}>
-                                        {formatAmount(parseFloat(expense.amount), expense.currency)}
+                                        {formatAmount(parseFloat(detail.amount), detail.currency)}
                                     </span>
                                 )}
                             </div>
@@ -308,7 +336,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                     />
                                 ) : (
                                     <span className="text-sm" style={{ color: 'var(--heading)' }}>
-                                        {formatDate(expense.expenseDate)}
+                                        {formatDate(detail.expenseDate)}
                                     </span>
                                 )}
                             </div>
@@ -326,7 +354,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                             <option key={c} value={c}>{c}</option>
                                         ))}
                                     </select>
-                                ) : expense.category ? (
+                                ) : detail.category ? (
                                     <span className="flex items-center gap-1.5 text-sm font-medium" style={{ color: categoryColor }}>
                                         <span
                                             style={{
@@ -338,7 +366,7 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                                 display: 'inline-block',
                                             }}
                                         />
-                                        {expense.category}
+                                        {detail.category}
                                     </span>
                                 ) : (
                                     <span style={{ color: 'var(--muted)' }} className="text-sm">—</span>
@@ -358,17 +386,17 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                             <option key={u.id} value={u.id}>{u.name}</option>
                                         ))}
                                     </select>
-                                ) : expense.payments && expense.payments.length > 1 ? (
+                                ) : detail.payments && detail.payments.length > 1 ? (
                                     <div className="flex flex-col items-end gap-1">
-                                        {expense.payments.map((p) => (
+                                        {detail.payments.map((p) => (
                                             <span key={p.userId} className="text-sm font-medium" style={{ color: 'var(--heading)' }}>
-                                                {p.name} <span className="font-mono" style={{ color: 'var(--muted)' }}>({formatAmount(parseFloat(p.amount), expense.currency)})</span>
+                                                {p.name} <span className="font-mono" style={{ color: 'var(--muted)' }}>({formatAmount(parseFloat(p.amount), detail.currency)})</span>
                                             </span>
                                         ))}
                                     </div>
                                 ) : (
                                     <span className="text-sm font-medium" style={{ color: 'var(--heading)' }}>
-                                        {expense.paidByName}
+                                        {detail.paidByName}
                                     </span>
                                 )}
                             </div>
@@ -383,9 +411,9 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                                         onChange={(e) => setNotes(e.target.value)}
                                         style={{ flex: 1, maxWidth: '220px', minHeight: '48px' }}
                                     />
-                                ) : expense.notes ? (
+                                ) : detail.notes ? (
                                     <span className="text-right text-sm" style={{ color: 'var(--heading)' }}>
-                                        {expense.notes}
+                                        {detail.notes}
                                     </span>
                                 ) : (
                                     <span style={{ color: 'var(--muted)' }} className="text-sm">—</span>
@@ -415,23 +443,35 @@ export function ExpenseDetailModal({ expenseId, groupId, onClose }: ExpenseDetai
                         </div>
 
                         {/* Split Between Card */}
-                        {expense.splits.length > 0 && (
+                        {detail.splits === null ? (
                             <div className="card-dark space-y-3">
                                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
                                     Split Between
                                 </p>
-                                {expense.splits.map((split) => (
+                                {(detail.participantIds.length > 0 ? detail.participantIds : ['']).map((id, i) => (
+                                    <div key={id || i} className="flex items-center justify-between">
+                                        <div className="skeleton-block" style={{ width: '40%', height: '0.875rem' }} />
+                                        <div className="skeleton-block" style={{ width: '3.5rem', height: '0.875rem' }} />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : detail.splits.length > 0 ? (
+                            <div className="card-dark space-y-3">
+                                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
+                                    Split Between
+                                </p>
+                                {detail.splits.map((split) => (
                                     <div key={split.userId} className="flex items-center justify-between">
                                         <span className="text-sm" style={{ color: 'var(--heading)' }}>
                                             {split.name}
                                         </span>
                                         <span className="font-mono text-sm" style={{ color: 'var(--muted)' }}>
-                                            {formatAmount(parseFloat(split.amount), expense.currency)}
+                                            {formatAmount(parseFloat(split.amount), detail.currency)}
                                         </span>
                                     </div>
                                 ))}
                             </div>
-                        )}
+                        ) : null}
                     </>
                 )}
             </div>

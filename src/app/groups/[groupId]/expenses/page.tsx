@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import type { Expense } from '~/app/_components/expense-detail-modal'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Tabs from '~/app/_components/tabs'
@@ -9,18 +10,6 @@ import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
 import { useGroupIdentity } from '~/app/_components/use-group-identity'
 import { categoryGlyph } from '~/lib/category-glyphs'
-
-interface Expense {
-    id: number
-    title: string
-    amount: string
-    currency: string
-    category: string | null
-    notes: string | null
-    expenseDate: Date
-    paidByUserId: string
-    participantIds: string[]
-}
 
 const CATEGORY_COLORS: Record<string, string> = {
     Food: '#F59E0B',
@@ -105,26 +94,54 @@ const FilterChip = ({
     </button>
 )
 
+// Small first page so the list paints fast on mobile; the rest streams in below.
+const PAGE_SIZE = 25
+
 const ExpensesTab = () => {
     const router = useRouter()
     const pathname = usePathname()
     const groupId = pathname.split('/')[2]?.toString()
-    const [expenses, setExpenses] = useState<Expense[]>([])
     const [selectedExpenseId, setSelectedExpenseId] = useState<number | null>(null)
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
     const [viewMode, setViewMode] = useState<'all' | 'me'>('all')
     const [searchQuery, setSearchQuery] = useState('')
     const { identity, isLoaded: identityLoaded } = useGroupIdentity(groupId)
+    const utils = api.useUtils()
 
-    const { data: expensesData, error: expensesError } = api.expense.getExpenses.useQuery(
-        { groupId: groupId ?? '' },
-        { enabled: !!groupId }
+    const {
+        data: expensesData,
+        error: expensesError,
+        isLoading,
+        hasNextPage,
+        isFetchingNextPage,
+        fetchNextPage,
+    } = api.expense.getExpenses.useInfiniteQuery(
+        { groupId: groupId ?? '', limit: PAGE_SIZE },
+        {
+            enabled: !!groupId,
+            getNextPageParam: (lastPage) => {
+                if (lastPage.length < PAGE_SIZE) return undefined
+                const last = lastPage[lastPage.length - 1]!
+                return { expenseDate: last.expenseDate, id: last.id }
+            },
+        }
     )
 
+    // Keep pulling the remaining pages in the background — the first page is
+    // already on screen, so the user never waits on the full list.
     useEffect(() => {
-        if (expensesData) setExpenses(expensesData)
+        if (hasNextPage && !isFetchingNextPage) void fetchNextPage()
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+    useEffect(() => {
         if (expensesError) console.error('Error fetching expenses', expensesError)
-    }, [expensesData, expensesError])
+    }, [expensesError])
+
+    const expenses = useMemo<Expense[]>(
+        () => expensesData?.pages.flat() ?? [],
+        [expensesData]
+    )
+    const loadingMore = hasNextPage || isFetchingNextPage
 
     const navigateToTab = (tab: string) => {
         router.push(`/groups/${groupId}/${tab}`)
@@ -191,11 +208,13 @@ const ExpensesTab = () => {
                         <div className="section-title">Expenses</div>
                         <div className="section-sub">
                             {expenses.length === 0
-                                ? 'No expenses yet'
+                                ? isLoading
+                                    ? 'Loading expenses…'
+                                    : 'No expenses yet'
                                 : (() => {
                                     const base =
                                         selectedCategory === null && viewMode === 'all'
-                                            ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`
+                                            ? `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} ${loadingMore ? 'loaded…' : 'recorded'}`
                                             : `${totalExpenseCount} expense${totalExpenseCount !== 1 ? 's' : ''}${selectedCategory ? ` in ${selectedCategory}` : ''}`
                                     return searchQuery.trim()
                                         ? `${base} matching "${searchQuery.trim()}"`
@@ -276,7 +295,29 @@ const ExpensesTab = () => {
                     </div>
                 )}
 
-                {expenses.length === 0 ? (
+                {expenses.length === 0 && isLoading ? (
+                    <div className="card-dark anim-fade-up d-1" style={{ padding: 0, overflow: 'hidden' }}>
+                        {[0, 1, 2, 3].map((i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.875rem 1.25rem',
+                                    borderBottom: i < 3 ? '1px solid var(--border)' : 'none',
+                                }}
+                            >
+                                <div className="skeleton-block" style={{ width: '36px', height: '36px' }} />
+                                <div style={{ flex: 1 }}>
+                                    <div className="skeleton-block" style={{ width: '55%', height: '0.875rem', marginBottom: '0.375rem' }} />
+                                    <div className="skeleton-block" style={{ width: '30%', height: '0.625rem' }} />
+                                </div>
+                                <div className="skeleton-block" style={{ width: '4rem', height: '0.875rem' }} />
+                            </div>
+                        ))}
+                    </div>
+                ) : expenses.length === 0 ? (
                     <div
                         className="card-dark anim-fade-up d-1"
                         style={{ textAlign: 'center', padding: '3rem 1.5rem' }}
@@ -391,6 +432,8 @@ const ExpensesTab = () => {
                                                         <div
                                                             key={expense.id}
                                                             onClick={() => setSelectedExpenseId(expense.id)}
+                                                            onMouseEnter={() => void utils.expense.getExpense.prefetch({ expenseId: expense.id })}
+                                                            onTouchStart={() => void utils.expense.getExpense.prefetch({ expenseId: expense.id })}
                                                             className="cursor-pointer transition-colors hover:bg-white/5"
                                                             style={{
                                                                 display: 'flex',
@@ -458,6 +501,18 @@ const ExpensesTab = () => {
                                         </div>
                                     )
                                 })}
+                                {loadingMore && (
+                                    <div
+                                        style={{
+                                            textAlign: 'center',
+                                            color: 'var(--muted)',
+                                            fontSize: '0.75rem',
+                                            padding: '0.25rem 0 0.75rem',
+                                        }}
+                                    >
+                                        Loading more…
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
@@ -466,6 +521,7 @@ const ExpensesTab = () => {
 
             <ExpenseDetailModal
                 expenseId={selectedExpenseId}
+                seed={expenses.find((e) => e.id === selectedExpenseId) ?? null}
                 groupId={groupId ?? ''}
                 onClose={() => setSelectedExpenseId(null)}
             />
