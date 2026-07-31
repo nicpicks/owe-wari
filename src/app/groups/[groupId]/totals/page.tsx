@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Tabs from '~/app/_components/tabs'
 import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
+import { toDefaultCurrency } from '~/lib/fx-rates'
 
 const CATEGORY_COLORS: Record<string, string> = {
     Food: '#F59E0B',
@@ -38,8 +39,34 @@ const TotalsTab = () => {
         { enabled: !!groupId }
     )
 
+    const { data: group } = api.group.getGroup.useQuery(
+        { groupId },
+        { enabled: !!groupId }
+    )
+
+    const { data: rates } = api.group.getRates.useQuery(
+        { groupId },
+        { enabled: !!groupId }
+    )
+
     const expenses = expensesData ?? []
     const users = usersData ?? []
+    const defaultCurrency = group?.currency ?? 'SGD'
+
+    /**
+     * A single default-currency figure for rows that span currencies — the
+     * per-currency amounts alone are hard to compare at a glance.
+     */
+    const combined = (totals: Map<string, number>) => {
+        const codes = Array.from(totals.keys())
+        const hasForeign = codes.some((c) => c !== defaultCurrency)
+        if (!hasForeign) return null
+        let sum = 0
+        for (const [currency, total] of totals) {
+            sum += toDefaultCurrency(total, currency, defaultCurrency, rates)
+        }
+        return sum
+    }
 
     const categoryRows = useMemo(() => {
         const map = new Map<string, { totals: Map<string, number>; count: number }>()
@@ -120,6 +147,7 @@ const TotalsTab = () => {
 
                     {categoryRows.map(({ cat, totals, count }) => {
                         const color = CATEGORY_COLORS[cat] ?? '#717171'
+                        const combinedTotal = combined(totals)
                         return (
                             <div key={cat} className="ledger-row">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
@@ -157,6 +185,11 @@ const TotalsTab = () => {
                                             {formatAmount(total, currency)}
                                         </span>
                                     ))}
+                                    {combinedTotal != null && (
+                                        <span className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--amber)' }}>
+                                            ≈ {formatAmount(combinedTotal, defaultCurrency)}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         )
@@ -169,47 +202,57 @@ const TotalsTab = () => {
                         <div className="section-sub">Total paid per person</div>
                     </div>
 
-                    {memberRows.map(({ userId, name, totals }) => (
-                        <div key={userId} className="ledger-row">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                                <div
-                                    style={{
-                                        width: '28px',
-                                        height: '28px',
-                                        borderRadius: '50%',
-                                        background: 'var(--surface-3)',
-                                        border: '1px solid var(--border-2)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.6875rem',
-                                        fontWeight: 700,
-                                        color: 'var(--dim)',
-                                        flexShrink: 0,
-                                        textTransform: 'uppercase',
-                                    }}
-                                >
-                                    {name.charAt(0)}
+                    {memberRows.map(({ userId, name, totals }) => {
+                        const combinedTotal = combined(totals)
+                        return (
+                            <div key={userId} className="ledger-row">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                                    <div
+                                        style={{
+                                            width: '28px',
+                                            height: '28px',
+                                            borderRadius: '50%',
+                                            background: 'var(--surface-3)',
+                                            border: '1px solid var(--border-2)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '0.6875rem',
+                                            fontWeight: 700,
+                                            color: 'var(--dim)',
+                                            flexShrink: 0,
+                                            textTransform: 'uppercase',
+                                        }}
+                                    >
+                                        {name.charAt(0)}
+                                    </div>
+                                    <span style={{ color: 'var(--body)', fontSize: '0.9375rem' }}>{name}</span>
                                 </div>
-                                <span style={{ color: 'var(--body)', fontSize: '0.9375rem' }}>{name}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.125rem' }}>
+                                    {totals.size === 0 ? (
+                                        <span className="font-mono" style={{ fontSize: '0.9375rem', color: 'var(--muted)' }}>—</span>
+                                    ) : (
+                                        <>
+                                            {Array.from(totals.entries()).map(([currency, total]) => (
+                                                <span
+                                                    key={currency}
+                                                    className="font-mono"
+                                                    style={{ fontSize: '0.9375rem', color: 'var(--heading)' }}
+                                                >
+                                                    {formatAmount(total, currency)}
+                                                </span>
+                                            ))}
+                                            {combinedTotal != null && (
+                                                <span className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--amber)' }}>
+                                                    ≈ {formatAmount(combinedTotal, defaultCurrency)}
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.125rem' }}>
-                                {totals.size === 0 ? (
-                                    <span className="font-mono" style={{ fontSize: '0.9375rem', color: 'var(--muted)' }}>—</span>
-                                ) : (
-                                    Array.from(totals.entries()).map(([currency, total]) => (
-                                        <span
-                                            key={currency}
-                                            className="font-mono"
-                                            style={{ fontSize: '0.9375rem', color: 'var(--heading)' }}
-                                        >
-                                            {formatAmount(total, currency)}
-                                        </span>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         </div>

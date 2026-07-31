@@ -17,14 +17,35 @@ export const mcpTools = {
             'Get a group by its ULID, including members and enabled currencies. Use this to confirm a group exists and to discover member IDs and currency codes before creating expenses or settling up.',
         inputSchema: { groupId: groupIdSchema },
         handler: async ({ groupId }: { groupId: string }) => {
-            const [group, members, currencies] = await Promise.all([
+            const [group, members, currencies, rates] = await Promise.all([
                 api.group.getGroup({ groupId }),
                 api.group.getUsers({ groupId }),
                 api.group.getCurrencies({ groupId }),
+                api.group.getRates({ groupId }),
             ])
             if (!group) throw new Error(`Group ${groupId} not found`)
-            return { group, members, currencies }
+            return { group, members, currencies, rates }
         },
+    },
+
+    set_conversion_rate: {
+        description:
+            "Set the group's agreed conversion rate for one currency, so debts in it can be shown and settled in the group's default currency. CONFIRM WITH THE USER before calling. `rate` is how many units of `code` one unit of the default currency buys — for a group defaulting to SGD, code MYR and rate 3.5 means \"S$1 = RM3.50\". Use get_group first to see the default currency and any rates already set.",
+        inputSchema: {
+            groupId: groupIdSchema,
+            code: z
+                .string()
+                .length(3)
+                .describe(
+                    "3-letter ISO code to quote; must be enabled for the group and must not be the group's default currency"
+                ),
+            rate: z
+                .number()
+                .positive()
+                .describe('Units of `code` per 1 unit of the group default currency'),
+        },
+        handler: async (input: { groupId: string; code: string; rate: number }) =>
+            api.group.setRate(input),
     },
 
     list_expenses: {

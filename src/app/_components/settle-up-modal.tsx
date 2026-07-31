@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { api } from '~/trpc/react'
 import { formatAmount } from '~/lib/format-currency'
-import { getDefaultRate } from '~/lib/fx-rates'
+import { CURRENCY_SYMBOLS, isSupportedCurrency } from '~/lib/currencies'
+import { formatRate, resolveRate, type GroupRate } from '~/lib/fx-rates'
 
 interface SettleLine {
     currency: string
@@ -11,45 +13,70 @@ interface SettleLine {
 
 interface Props {
     open: boolean
+    groupId: string
     fromName: string
     toName: string
     defaultCurrency: string
+    /** Rates the group agreed on; used to prefill each line. */
+    savedRates: GroupRate[] | undefined
     lines: SettleLine[]
     onClose: () => void
     onConfirm: (lines: SettleLine[]) => void
     isSubmitting: boolean
 }
 
+function symbolFor(code: string): string {
+    return isSupportedCurrency(code) ? CURRENCY_SYMBOLS[code] : code
+}
+
 export default function SettleUpModal({
     open,
+    groupId,
     fromName,
     toName,
     defaultCurrency,
+    savedRates,
     lines,
     onClose,
     onConfirm,
     isSubmitting,
 }: Props) {
-    // rates[code] = "1 unit of `code` in defaultCurrency"
+    // rates[code] = units of `code` per 1 unit of defaultCurrency (same
+    // direction the group's saved rate is stored in)
     const [rates, setRates] = useState<Record<string, number>>({})
 
     useEffect(() => {
         const next: Record<string, number> = {}
         for (const line of lines) {
             if (line.currency === defaultCurrency) continue
-            next[line.currency] = getDefaultRate(line.currency, defaultCurrency)
+            next[line.currency] = resolveRate(defaultCurrency, line.currency, savedRates).rate
         }
         setRates(next)
-    }, [lines, defaultCurrency])
+    }, [lines, defaultCurrency, savedRates])
 
     const total = useMemo(() => {
         let sum = 0
         for (const line of lines) {
-            if (line.currency === defaultCurrency) sum += line.amount
-            else sum += line.amount * (rates[line.currency] ?? 1)
+            if (line.currency === defaultCurrency) {
+                sum += line.amount
+                continue
+            }
+            const rate = rates[line.currency]
+            sum += rate ? line.amount / rate : line.amount
         }
         return sum
     }, [lines, rates, defaultCurrency])
+
+    const utils = api.useUtils()
+    const setRate = api.group.setRate.useMutation({
+        onSuccess: async () => {
+            await utils.group.getRates.invalidate({ groupId })
+        },
+        onError: (error) => {
+            console.error('Error saving rate:', error)
+            alert(error.message || 'Failed to save the conversion rate')
+        },
+    })
 
     if (!open) return null
 
@@ -71,7 +98,11 @@ export default function SettleUpModal({
                     {lines.map((line) => {
                         const isDefault = line.currency === defaultCurrency
                         const rate = rates[line.currency] ?? 1
-                        const converted = line.amount * rate
+                        const converted = rate ? line.amount / rate : line.amount
+                        const groupRate = resolveRate(defaultCurrency, line.currency, savedRates)
+                        // Only worth offering when the typed rate is a real change
+                        const differsFromGroup =
+                            !isDefault && rate > 0 && Math.abs(rate - groupRate.rate) > 1e-9
                         return (
                             <div
                                 key={line.currency}
@@ -88,31 +119,67 @@ export default function SettleUpModal({
                                     {formatAmount(line.amount, line.currency)} {line.currency}
                                 </div>
                                 {!isDefault && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--muted)' }}>
-                                        <span>×</span>
-                                        <input
-                                            type="number"
-                                            step="0.0001"
-                                            value={rate}
-                                            onChange={(e) =>
-                                                setRates((prev) => ({
-                                                    ...prev,
-                                                    [line.currency]: parseFloat(e.target.value) || 0,
-                                                }))
-                                            }
-                                            style={{
-                                                width: '90px',
-                                                padding: '0.125rem 0.375rem',
-                                                background: 'var(--surface-3)',
-                                                border: '1px solid var(--border)',
-                                                borderRadius: '4px',
-                                                color: 'var(--body)',
-                                                fontFamily: 'var(--font-mono)',
-                                                fontSize: '0.75rem',
-                                            }}
-                                        />
-                                        <span>= {formatAmount(converted, defaultCurrency)} {defaultCurrency}</span>
-                                    </div>
+                                    <>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--muted)', flexWrap: 'wrap' }}>
+                                            <span>
+                                                {symbolFor(defaultCurrency)}1 =
+                                            </span>
+                                            <input
+                                                type="number"
+                                                step="0.0001"
+                                                min="0"
+                                                inputMode="decimal"
+                                                value={rate}
+                                                onChange={(e) =>
+                                                    setRates((prev) => ({
+                                                        ...prev,
+                                                        [line.currency]: parseFloat(e.target.value) || 0,
+                                                    }))
+                                                }
+                                                style={{
+                                                    width: '90px',
+                                                    padding: '0.125rem 0.375rem',
+                                                    background: 'var(--surface-3)',
+                                                    border: '1px solid var(--border)',
+                                                    borderRadius: '4px',
+                                                    color: 'var(--body)',
+                                                    fontFamily: 'var(--font-mono)',
+                                                    fontSize: '0.75rem',
+                                                }}
+                                            />
+                                            <span>
+                                                {line.currency} → {formatAmount(converted, defaultCurrency)}{' '}
+                                                {defaultCurrency}
+                                            </span>
+                                        </div>
+                                        {differsFromGroup && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setRate.mutate({
+                                                        groupId,
+                                                        code: line.currency,
+                                                        rate,
+                                                    })
+                                                }
+                                                disabled={setRate.isPending}
+                                                style={{
+                                                    alignSelf: 'flex-start',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    padding: 0,
+                                                    color: 'var(--amber)',
+                                                    fontSize: '0.6875rem',
+                                                    cursor: setRate.isPending ? 'not-allowed' : 'pointer',
+                                                    textDecoration: 'underline',
+                                                }}
+                                            >
+                                                {setRate.isPending
+                                                    ? 'Saving…'
+                                                    : `Save ${formatRate(rate)} as the group rate`}
+                                            </button>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )
