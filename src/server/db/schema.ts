@@ -10,6 +10,7 @@ import {
     serial,
     text,
     timestamp,
+    uniqueIndex,
     varchar,
 } from 'drizzle-orm/pg-core'
 
@@ -84,6 +85,29 @@ export const groupCurrencies = createTable(
     },
     (t) => ({
         groupIdIdx: index('idx_group_currencies_group_id').on(t.groupId),
+    })
+)
+
+export const groupRates = createTable(
+    'group_rates',
+    {
+        id: serial('id').primaryKey().notNull(),
+        groupId: varchar('group_id', { length: 26 })
+            .references(() => groups.id)
+            .notNull(),
+        code: varchar('code', { length: 3 }).notNull(),
+        // Units of `code` that one unit of the group's default currency buys.
+        // Group default SGD + code MYR + rate 3.5 reads "S$1 = RM3.50".
+        rate: numeric('rate').notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+        updatedAt: timestamp('updated_at', { withTimezone: true }).default(
+            sql`CURRENT_TIMESTAMP`
+        ),
+    },
+    (t) => ({
+        groupCodeIdx: uniqueIndex('idx_group_rates_group_code').on(t.groupId, t.code),
     })
 )
 

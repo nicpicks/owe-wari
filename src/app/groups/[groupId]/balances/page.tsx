@@ -4,9 +4,11 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import Tabs from '~/app/_components/tabs'
 import SettleUpModal from '~/app/_components/settle-up-modal'
+import ConversionRateCard from '~/app/_components/conversion-rate-card'
 import { api } from '~/trpc/react'
 import { simplifyDebts, type Transfer } from '~/lib/simplify-debts'
 import { formatAmount } from '~/lib/format-currency'
+import { toDefaultCurrency } from '~/lib/fx-rates'
 
 interface PendingSettle {
     fromUserId: string
@@ -33,8 +35,24 @@ const BalancesTab = () => {
         { groupId },
         { enabled: !!groupId }
     )
+    const { data: rates } = api.group.getRates.useQuery(
+        { groupId },
+        { enabled: !!groupId }
+    )
 
     const defaultCurrency = group?.currency ?? 'SGD'
+
+    // Foreign currencies with money still outstanding — the ones worth quoting
+    const activeCodes = useMemo(() => {
+        if (!balances) return []
+        return Array.from(
+            new Set(
+                balances
+                    .filter((b) => b.currency !== defaultCurrency && Math.abs(b.netBalance) > 0.005)
+                    .map((b) => b.currency)
+            )
+        )
+    }, [balances, defaultCurrency])
 
     const [pending, setPending] = useState<PendingSettle | null>(null)
     // Pairs settled during this visit — kept on screen, dimmed, with a 済 stamp
@@ -94,6 +112,13 @@ const BalancesTab = () => {
 
             <div className="page-container" style={{ paddingTop: '2rem', paddingBottom: '3rem' }}>
 
+                {/* Agreed conversion rate — drives every converted figure below */}
+                <ConversionRateCard
+                    groupId={groupId}
+                    defaultCurrency={defaultCurrency}
+                    activeCodes={activeCodes}
+                />
+
                 {/* Who owes whom — one row per (from, to) pair with an inline Settle CTA */}
                 <div className="card-dark anim-fade-up d-0">
                     <div style={{ marginBottom: '1.25rem' }}>
@@ -119,6 +144,16 @@ const BalancesTab = () => {
                         const transfers = transfersByPair.get(key)!
                         const first = transfers[0]!
                         const lines = transfers.map((t) => ({ currency: t.currency, amount: t.amount }))
+                        const originalStr = transfers
+                            .map((t) => formatAmount(t.amount, t.currency))
+                            .join(' + ')
+                        // With foreign debts in the mix, lead with the single
+                        // default-currency figure the payer actually hands over.
+                        const hasForeign = transfers.some((t) => t.currency !== defaultCurrency)
+                        const convertedTotal = transfers.reduce(
+                            (sum, t) => sum + toDefaultCurrency(t.amount, t.currency, defaultCurrency, rates),
+                            0
+                        )
                         return (
                             <div key={key} className="ledger-row">
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -127,9 +162,20 @@ const BalancesTab = () => {
                                         <span style={{ color: 'var(--muted)', fontSize: '0.8125rem' }}>→</span>
                                         <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{first.toName}</span>
                                     </div>
-                                    <div className="font-mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)', marginTop: '0.125rem' }}>
-                                        {transfers.map((t) => formatAmount(t.amount, t.currency)).join(' + ')}
-                                    </div>
+                                    {hasForeign ? (
+                                        <>
+                                            <div className="font-mono" style={{ fontSize: '0.9375rem', color: 'var(--amber)', marginTop: '0.1875rem' }}>
+                                                {formatAmount(convertedTotal, defaultCurrency)}
+                                            </div>
+                                            <div className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.0625rem' }}>
+                                                {originalStr}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="font-mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)', marginTop: '0.125rem' }}>
+                                            {originalStr}
+                                        </div>
+                                    )}
                                 </div>
                                 <button
                                     className="btn-sm-settle"
@@ -170,9 +216,11 @@ const BalancesTab = () => {
 
             <SettleUpModal
                 open={!!pending}
+                groupId={groupId}
                 fromName={pending?.fromName ?? ''}
                 toName={pending?.toName ?? ''}
                 defaultCurrency={defaultCurrency}
+                savedRates={rates}
                 lines={pending?.lines ?? []}
                 onClose={() => setPending(null)}
                 isSubmitting={settleUp.isPending}

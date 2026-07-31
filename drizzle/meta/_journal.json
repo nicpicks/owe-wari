@@ -78,6 +78,13 @@
       "when": 1751414400000,
       "tag": "0011_group_trip_url",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1753920000000,
+      "tag": "0012_group_rates",
+      "breakpoints": true
     }
   ]
 }
