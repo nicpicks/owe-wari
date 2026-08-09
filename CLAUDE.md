@@ -56,6 +56,11 @@ Three routers exposed at `/api/trpc`:
 ### Debt simplification (`src/lib/simplify-debts.ts`)
 `simplifyDebts(balances)` runs a greedy min-cash-flow algorithm on the `Balance[]` returned by `getBalances`, reducing N debts to at most N−1 transfers. Used client-side on the balances page.
 
+### Split modes (`src/app/_components/create-expense.tsx`)
+The expense form offers four ways to split: **Even**, **Portions** (relative shares — a bigger eater takes 2, someone who skipped takes 0), **%**, and **Manual**. They live in the `SPLIT_MODES` array; each entry supplies a `validate` (gates the submit button) and a `toPayload` (returns `splitUserIds` for the even split, or explicit `splitAmounts`). Adding a mode means adding an array entry plus its row UI — no API change.
+
+Portions and percentages become amounts via `allocateByWeight` (`src/lib/split-allocation.ts`), a largest-remainder allocator working in whole cents, so per-user splits always sum to the expense total exactly.
+
 ### Frontend (`src/app/`)
 - Pages are under `src/app/groups/[groupId]/` with tabs: summary, expenses, balances, history, settings
 - Shared UI components are in `src/app/_components/`

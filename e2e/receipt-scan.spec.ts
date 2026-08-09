@@ -10,8 +10,9 @@ const TRPC_ROUTE_PATTERN = '**/api/trpc/receipt.scan**'
 // The chunk [0, 0(fulfilled), [[data]]] resolves that promise with data.
 const HEAD_LINE = JSON.stringify({ json: { '0': [[0], [null, 0, 0]] } }) + '\n'
 
-function mockScanSuccess(amount: number | null): string {
-  const chunk = JSON.stringify({ json: [0, 0, [[{ result: { data: { amount } } }]]] }) + '\n'
+function mockScanSuccess(total: number | null): string {
+  const chunk =
+    JSON.stringify({ json: [0, 0, [[{ result: { data: { total, items: [] } } }]]] }) + '\n'
   return HEAD_LINE + chunk
 }
 
@@ -67,7 +68,7 @@ test.describe('Receipt scan feature', () => {
     })
 
     // FileReader is async — wait for the amount field to update
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]')
+    const amountInput = page.locator('input[type="text"][placeholder="0.00"]')
     await expect(amountInput).toHaveValue('42.5', { timeout: 5_000 })
   })
 
@@ -94,7 +95,7 @@ test.describe('Receipt scan feature', () => {
     await dialog.accept()
 
     // Amount field should remain empty
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]')
+    const amountInput = page.locator('input[type="text"][placeholder="0.00"]')
     await expect(amountInput).toHaveValue('')
   })
 

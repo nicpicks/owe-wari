@@ -10,6 +10,7 @@ export default async function globalSetup() {
   const group = await trpcMutation<{ id: string }>('group.create', {
     name: 'Playwright Test Group',
     currency: 'USD',
+    currencies: ['USD'],
     description: 'Auto-created by Playwright globalSetup',
     userNames: ['Alice', 'Bob', 'Charlie'],
     defaultPayee: 'Alice',

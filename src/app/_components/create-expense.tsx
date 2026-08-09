@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '~/trpc/react'
+import { allocateByWeight, evenPercents } from '~/lib/split-allocation'
 import { useGroupIdentity } from './use-group-identity'
 
 interface User {
@@ -28,15 +29,22 @@ function getInitials(name: string, allNames: string[]): string {
     return first
 }
 
+/** 3 → "3", 1.5 → "1.5", 33.33 → "33.33" (no trailing zeros). */
+function formatPortion(value: number): string {
+    return String(Math.round(value * 100) / 100)
+}
+
 // ─── Extensible split mode system ────────────────────────────────────────────
 
-type SplitMode = 'even' | 'manual'
+type SplitMode = 'even' | 'portions' | 'percent' | 'manual'
 
 interface SplitModeContext {
     users: User[]
     amount: number
     isChecked: Record<string, boolean>
     manualAmounts: Record<string, number>
+    portions: Record<string, number>
+    percents: Record<string, number>
 }
 
 interface SplitPayload {
@@ -47,14 +55,36 @@ interface SplitPayload {
 interface SplitModeConfig {
     key: SplitMode
     label: string
+    title: string
     validate: (ctx: SplitModeContext) => boolean
     toPayload: (ctx: SplitModeContext) => SplitPayload
+}
+
+/** Sum a per-user weight map over the group's members. */
+function sumWeights(users: User[], weights: Record<string, number>): number {
+    return users.reduce((s, u) => s + (weights[u.id] ?? 0), 0)
+}
+
+/**
+ * Turn relative weights (portions or percentages) into per-user amounts that
+ * add up to the expense total exactly. Members weighted 0 are left out.
+ */
+function weightedSplitAmounts(
+    users: User[],
+    amount: number,
+    weights: Record<string, number>
+): { userId: string; amount: number }[] {
+    const allocated = allocateByWeight(amount, users.map((u) => weights[u.id] ?? 0))
+    return users
+        .map((u, i) => ({ userId: u.id, amount: allocated[i] ?? 0 }))
+        .filter((s) => s.amount > 0)
 }
 
 const SPLIT_MODES: SplitModeConfig[] = [
     {
         key: 'even',
         label: 'Even',
+        title: 'Split evenly',
         validate: ({ isChecked }) => Object.values(isChecked).some(Boolean),
         toPayload: ({ isChecked }) => ({
             splitUserIds: Object.entries(isChecked)
@@ -63,8 +93,28 @@ const SPLIT_MODES: SplitModeConfig[] = [
         }),
     },
     {
+        key: 'portions',
+        label: 'Portions',
+        title: 'Split by portions — bigger eaters take more shares',
+        validate: ({ users, amount, portions }) => amount > 0 && sumWeights(users, portions) > 0,
+        toPayload: ({ users, amount, portions }) => ({
+            splitAmounts: weightedSplitAmounts(users, amount, portions),
+        }),
+    },
+    {
+        key: 'percent',
+        label: '%',
+        title: 'Split by percentage',
+        validate: ({ users, amount, percents }) =>
+            amount > 0 && Math.abs(sumWeights(users, percents) - 100) < 0.01,
+        toPayload: ({ users, amount, percents }) => ({
+            splitAmounts: weightedSplitAmounts(users, amount, percents),
+        }),
+    },
+    {
         key: 'manual',
         label: 'Manual',
+        title: 'Enter each person’s amount',
         validate: ({ amount, manualAmounts }) =>
             amount > 0 &&
             Math.abs(Object.values(manualAmounts).reduce((s, v) => s + v, 0) - amount) < 0.01,
@@ -143,6 +193,12 @@ export default function CreateExpense() {
     const [isChecked, setIsChecked] = useState<Record<string, boolean>>({})
     const [splitMode, setSplitMode] = useState<SplitMode>('even')
     const [manualAmounts, setManualAmounts] = useState<Record<string, number>>({})
+    const [portions, setPortions] = useState<Record<string, number>>({})
+    const [percents, setPercents] = useState<Record<string, number>>({})
+    // Portions/percentages are seeded from the Even-mode selection the first
+    // time you open that mode; once you've edited them we leave them alone.
+    const [portionsTouched, setPortionsTouched] = useState(false)
+    const [percentsTouched, setPercentsTouched] = useState(false)
     const [payMode, setPayMode] = useState<'single' | 'multiple'>('single')
     const [payAmounts, setPayAmounts] = useState<Record<string, number>>({})
     const [lineItems, setLineItems] = useState<LineItem[]>([])
@@ -182,6 +238,9 @@ export default function CreateExpense() {
             setIsChecked(init)
             setManualAmounts(initAmounts)
             setPayAmounts(initAmounts)
+            setPortions(Object.fromEntries(usersData.map((u) => [u.id, 1])))
+            const even = evenPercents(usersData.length)
+            setPercents(Object.fromEntries(usersData.map((u, i) => [u.id, even[i] ?? 0])))
             setLineItemMemberIds(usersData.map((u) => u.id))
             const userIds = new Set(usersData.map((u) => u.id))
             const preferred =
@@ -356,10 +415,89 @@ export default function CreateExpense() {
     const splitAmount = checkedCount > 0 ? amount / checkedCount : 0
 
     const activeModeConfig = SPLIT_MODES.find((m) => m.key === splitMode)!
-    const splitCtx: SplitModeContext = { users, amount, isChecked, manualAmounts }
+    const splitCtx: SplitModeContext = { users, amount, isChecked, manualAmounts, portions, percents }
     const splitValid = activeModeConfig.validate(splitCtx)
     const manualTotal = Object.values(manualAmounts).reduce((s, v) => s + v, 0)
     const manualRemaining = amount - manualTotal
+
+    // Portions / percentages: per-user amounts, pre-rounded to cents so what a
+    // member sees on their row is exactly what gets stored.
+    const portionTotal = sumWeights(users, portions)
+    const percentTotal = sumWeights(users, percents)
+    const percentRemaining = 100 - percentTotal
+    const weightedAmounts =
+        // While the percentages don't add up to 100 yet, show each row's literal
+        // share of the total (50% of $100 is $50) rather than a normalised one,
+        // so the gap stays visible instead of being silently spread around.
+        splitMode === 'percent' && Math.abs(percentRemaining) >= 0.01
+            ? users.map((u) => Math.round(amount * (percents[u.id] ?? 0)) / 100)
+            : allocateByWeight(amount, users.map((u) => (splitMode === 'percent' ? percents : portions)[u.id] ?? 0))
+
+    const setPortion = (userId: string, value: number) => {
+        setPortionsTouched(true)
+        setPortions((prev) => ({ ...prev, [userId]: Math.max(0, Math.round(value * 100) / 100) }))
+    }
+
+    const setPercent = (userId: string, value: number) => {
+        setPercentsTouched(true)
+        setPercents((prev) => ({ ...prev, [userId]: Math.max(0, Math.min(100, value)) }))
+    }
+
+    /** Spread 100% evenly across the members who currently have a share. */
+    const balancePercents = () => {
+        const ids = users.filter((u) => (percents[u.id] ?? 0) > 0).map((u) => u.id)
+        const targets = ids.length > 0 ? ids : users.map((u) => u.id)
+        const even = evenPercents(targets.length)
+        const next: Record<string, number> = Object.fromEntries(users.map((u) => [u.id, 0]))
+        targets.forEach((id, i) => { next[id] = even[i] ?? 0 })
+        setPercentsTouched(true)
+        setPercents(next)
+    }
+
+    // Opening Portions/% for the first time carries over who was ticked in Even
+    // mode, so an unticked member doesn't silently get a share.
+    const selectMode = (mode: SplitMode) => {
+        setSplitMode(mode)
+        const selected = users.filter((u) => isChecked[u.id])
+        const targets = selected.length > 0 ? selected : users
+        if (mode === 'portions' && !portionsTouched) {
+            setPortions(Object.fromEntries(
+                users.map((u) => [u.id, targets.some((t) => t.id === u.id) ? 1 : 0])
+            ))
+        }
+        if (mode === 'percent' && !percentsTouched) {
+            const even = evenPercents(targets.length)
+            const next: Record<string, number> = Object.fromEntries(users.map((u) => [u.id, 0]))
+            targets.forEach((t, i) => { next[t.id] = even[i] ?? 0 })
+            setPercents(next)
+        }
+    }
+
+    const splitSummary = (): string => {
+        if (hasLineItems) return 'Totals from receipt items'
+        if (splitMode === 'even') {
+            return checkedCount > 0 && amount > 0
+                ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
+                : `${checkedCount} of ${users.length} selected`
+        }
+        if (splitMode === 'portions') {
+            if (portionTotal <= 0) return 'Give at least one person a portion'
+            const label = `${formatPortion(portionTotal)} portion${portionTotal === 1 ? '' : 's'}`
+            return amount > 0
+                ? `${label} · $${(amount / portionTotal).toFixed(2)} per portion`
+                : `${label} · enter an amount above`
+        }
+        if (splitMode === 'percent') {
+            if (Math.abs(percentRemaining) < 0.01) {
+                return amount > 0 ? 'All assigned' : 'Enter an amount above first'
+            }
+            return `${formatPortion(Math.abs(percentRemaining))}% ${percentRemaining > 0 ? 'left' : 'over'}`
+        }
+        if (amount <= 0) return 'Enter an amount above first'
+        return Math.abs(manualRemaining) < 0.01
+            ? 'All assigned'
+            : `$${Math.abs(manualRemaining).toFixed(2)} ${manualRemaining > 0 ? 'remaining' : 'over'}`
+    }
 
     const payTotal = Object.values(payAmounts).reduce((s, v) => s + v, 0)
     const payRemaining = amount - payTotal
@@ -367,6 +505,23 @@ export default function CreateExpense() {
 
     const hasOp = /[+*/]/.test(rawAmount) || rawAmount.slice(1).includes('-')
     const exprPreview = hasOp ? evalExpr(rawAmount) : null
+
+    const stepperButton: React.CSSProperties = {
+        width: '24px',
+        height: '24px',
+        borderRadius: '6px',
+        border: '1px solid var(--border-2)',
+        background: 'none',
+        color: 'var(--dim)',
+        fontSize: '0.875rem',
+        lineHeight: 1,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        padding: 0,
+    }
 
     const allNames = users.map((u) => u.name)
     const submitDisabled = createExpense.isPending
@@ -853,33 +1008,23 @@ export default function CreateExpense() {
 
                     {/* Split */}
                     <div className={`card-dark anim-fade-up ${hasLineItems ? 'd-2' : 'd-1'}`} style={{ marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
                             <div>
                                 <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
                                     Split between
                                 </div>
-                                <div className="section-sub">
-                                    {hasLineItems
-                                        ? 'Totals from receipt items'
-                                        : splitMode === 'even'
-                                            ? checkedCount > 0 && amount > 0
-                                                ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
-                                                : `${checkedCount} of ${users.length} selected`
-                                            : amount > 0 && Math.abs(manualRemaining) < 0.01
-                                                ? 'All assigned'
-                                                : amount > 0
-                                                    ? `$${Math.abs(manualRemaining).toFixed(2)} ${manualRemaining > 0 ? 'remaining' : 'over'}`
-                                                    : 'Enter an amount above first'}
-                                </div>
+                                <div className="section-sub">{splitSummary()}</div>
                             </div>
                             {/* Mode toggle — hidden when line items are active */}
                             {!hasLineItems && (
                                 <div style={{ display: 'flex', border: '1px solid var(--border-2)', borderRadius: '6px', overflow: 'hidden', flexShrink: 0 }}>
-                                    {SPLIT_MODES.map(({ key, label }) => (
+                                    {SPLIT_MODES.map(({ key, label, title }) => (
                                         <button
                                             key={key}
                                             type="button"
-                                            onClick={() => setSplitMode(key)}
+                                            onClick={() => selectMode(key)}
+                                            title={title}
+                                            aria-pressed={splitMode === key}
                                             style={{
                                                 padding: '0.25rem 0.625rem',
                                                 fontSize: '0.75rem',
@@ -889,6 +1034,7 @@ export default function CreateExpense() {
                                                 background: splitMode === key ? 'var(--surface-3)' : 'none',
                                                 color: splitMode === key ? 'var(--heading)' : 'var(--dim)',
                                                 transition: 'background 0.15s, color 0.15s',
+                                                whiteSpace: 'nowrap',
                                             }}
                                         >
                                             {label}
@@ -949,6 +1095,139 @@ export default function CreateExpense() {
                                         )}
                                     </div>
                                 ))
+                            : splitMode === 'portions'
+                                ? users.map((user, i) => {
+                                    const portion = portions[user.id] ?? 0
+                                    const share = weightedAmounts[i] ?? 0
+                                    return (
+                                        <div
+                                            key={user.id}
+                                            className="check-row"
+                                            style={{ cursor: 'default' }}
+                                        >
+                                            <label style={{ flex: 1, opacity: portion > 0 ? 1 : 0.45 }}>{user.name}</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginRight: '0.75rem' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPortion(user.id, portion - 1)}
+                                                    disabled={portion <= 0}
+                                                    aria-label={`Fewer portions for ${user.name}`}
+                                                    style={{ ...stepperButton, opacity: portion <= 0 ? 0.4 : 1 }}
+                                                >
+                                                    −
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    min="0"
+                                                    step="0.5"
+                                                    placeholder="0"
+                                                    aria-label={`Portions for ${user.name}`}
+                                                    value={portion || ''}
+                                                    onChange={(e) => setPortion(user.id, parseFloat(e.target.value) || 0)}
+                                                    className="font-mono no-spinner"
+                                                    style={{
+                                                        width: '2.75rem',
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        borderBottom: '1px solid var(--border-2)',
+                                                        color: portion > 0 ? 'var(--heading)' : 'var(--muted)',
+                                                        fontSize: '0.875rem',
+                                                        textAlign: 'center',
+                                                        outline: 'none',
+                                                        padding: '0.125rem 0',
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPortion(user.id, portion + 1)}
+                                                    aria-label={`More portions for ${user.name}`}
+                                                    style={stepperButton}
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
+                                            <span
+                                                className="font-mono"
+                                                style={{
+                                                    fontSize: '0.875rem',
+                                                    color: share > 0 ? 'var(--heading)' : 'var(--muted)',
+                                                    minWidth: '4.5rem',
+                                                    textAlign: 'right',
+                                                }}
+                                            >
+                                                {share > 0 ? `$${share.toFixed(2)}` : '—'}
+                                            </span>
+                                        </div>
+                                    )
+                                })
+                            : splitMode === 'percent'
+                                ? (
+                                    <>
+                                        {users.map((user, i) => {
+                                            const percent = percents[user.id] ?? 0
+                                            const share = weightedAmounts[i] ?? 0
+                                            return (
+                                                <div
+                                                    key={user.id}
+                                                    className="check-row"
+                                                    style={{ cursor: 'default' }}
+                                                >
+                                                    <label style={{ flex: 1, opacity: percent > 0 ? 1 : 0.45 }}>{user.name}</label>
+                                                    <span
+                                                        className="font-mono"
+                                                        style={{
+                                                            fontSize: '0.8125rem',
+                                                            color: 'var(--muted)',
+                                                            marginRight: '0.75rem',
+                                                        }}
+                                                    >
+                                                        {share > 0 ? `$${share.toFixed(2)}` : '—'}
+                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.01"
+                                                        placeholder="0"
+                                                        aria-label={`Percentage for ${user.name}`}
+                                                        value={percent || ''}
+                                                        onChange={(e) => setPercent(user.id, parseFloat(e.target.value) || 0)}
+                                                        className="font-mono no-spinner"
+                                                        style={{
+                                                            width: '3.5rem',
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            borderBottom: '1px solid var(--border-2)',
+                                                            color: percent > 0 ? 'var(--heading)' : 'var(--muted)',
+                                                            fontSize: '0.875rem',
+                                                            textAlign: 'right',
+                                                            outline: 'none',
+                                                            padding: '0.125rem 0',
+                                                        }}
+                                                    />
+                                                    <span style={{ color: 'var(--muted)', fontSize: '0.8125rem', marginLeft: '0.25rem' }}>%</span>
+                                                </div>
+                                            )
+                                        })}
+                                        {users.length > 0 && Math.abs(percentRemaining) >= 0.01 && (
+                                            <button
+                                                type="button"
+                                                onClick={balancePercents}
+                                                style={{
+                                                    marginTop: '0.5rem',
+                                                    background: 'none', border: 'none',
+                                                    color: 'var(--dim)', cursor: 'pointer',
+                                                    fontSize: '0.75rem', fontFamily: 'var(--font-ui), sans-serif',
+                                                    padding: '0.25rem 0',
+                                                }}
+                                            >
+                                                Balance to 100%
+                                            </button>
+                                        )}
+                                    </>
+                                )
                                 : users.map((user) => (
                                     <div
                                         key={user.id}

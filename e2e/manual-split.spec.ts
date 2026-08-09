@@ -1,10 +1,13 @@
 import { test, expect } from './fixtures'
+import { setTotal } from './helpers/expense-form'
+import { identifyAs } from './helpers/identity'
 
 const TRPC_CREATE_PATTERN = '**/api/trpc/expense.create**'
 
 test.describe('Manual split mode', () => {
   test.beforeEach(async ({ page, groupId }) => {
     await page.goto(`/groups/${groupId}/expenses/create`)
+    await identifyAs(page, 'Alice')
     // Wait for group members to load
     await page.locator('.check-row label').first().waitFor({ state: 'visible', timeout: 10_000 })
   })
@@ -28,11 +31,8 @@ test.describe('Manual split mode', () => {
   })
 
   test('Add expense is disabled when manual amounts are all zero', async ({ page }) => {
+    await setTotal(page, '60')
     await page.locator('button', { hasText: 'Manual' }).click()
-    await page.locator('input[placeholder="0.00"]').first().fill('30')
-    // Set the expense amount
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]').first()
-    await amountInput.fill('60')
     // Leave manual amounts as zero → should be blocked
     const amountInputs = page.locator('.check-row input[type="number"]')
     for (const inp of await amountInputs.all()) {
@@ -42,9 +42,7 @@ test.describe('Manual split mode', () => {
   })
 
   test('Add expense is disabled when manual amounts do not sum to total', async ({ page }) => {
-    // Set expense amount
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]').first()
-    await amountInput.fill('90')
+    await setTotal(page, '90')
 
     await page.locator('button', { hasText: 'Manual' }).click()
 
@@ -60,8 +58,7 @@ test.describe('Manual split mode', () => {
   })
 
   test('Add expense is enabled when manual amounts exactly match total', async ({ page }) => {
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]').first()
-    await amountInput.fill('90')
+    await setTotal(page, '90')
 
     await page.locator('button', { hasText: 'Manual' }).click()
 
@@ -77,8 +74,7 @@ test.describe('Manual split mode', () => {
   })
 
   test('sub text shows remaining amount while manual inputs are incomplete', async ({ page }) => {
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]').first()
-    await amountInput.fill('60')
+    await setTotal(page, '60')
 
     await page.locator('button', { hasText: 'Manual' }).click()
 
@@ -90,8 +86,7 @@ test.describe('Manual split mode', () => {
   })
 
   test('sub text shows "All assigned" when amounts sum correctly', async ({ page }) => {
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]').first()
-    await amountInput.fill('60')
+    await setTotal(page, '60')
 
     await page.locator('button', { hasText: 'Manual' }).click()
 
@@ -114,8 +109,7 @@ test.describe('Manual split mode', () => {
   })
 
   test('submitting with manual amounts sends splitAmounts to the server', async ({ page }) => {
-    const amountInput = page.locator('input[type="number"][placeholder="0.00"]').first()
-    await amountInput.fill('90')
+    await setTotal(page, '90')
     await page.locator('input[placeholder="Dinner at Shinjuku"]').fill('Test manual split')
 
     await page.locator('button', { hasText: 'Manual' }).click()
