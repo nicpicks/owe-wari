@@ -61,6 +61,8 @@ The expense form offers four ways to split: **Even**, **Portions** (relative sha
 
 Portions and percentages become amounts via `allocateByWeight` (`src/lib/split-allocation.ts`), a largest-remainder allocator working in whole cents, so per-user splits always sum to the expense total exactly.
 
+Line items (from a receipt scan, or started by hand with the "+ Items" button) override the mode toggle: each item is split among the members tapped on its row. They also add themselves up into the hero total, until a total is typed by hand or read off a receipt — after that the total is the user's, and a drifting item sum is only offered ("Items add up to … — use that"), never applied.
+
 ### Frontend (`src/app/`)
 - Pages are under `src/app/groups/[groupId]/` with tabs: summary, expenses, balances, history, settings
 - Shared UI components are in `src/app/_components/`

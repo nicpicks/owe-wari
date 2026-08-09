@@ -185,6 +185,9 @@ export default function CreateExpense() {
     const [title, setTitle] = useState('')
     const [amount, setAmount] = useState(0)
     const [rawAmount, setRawAmount] = useState('')
+    // Until a total is entered by hand (or read off a receipt), the item rows
+    // add themselves up into it.
+    const [amountTouched, setAmountTouched] = useState(false)
     const [expenseDate, setExpenseDate] = useState(new Date())
     const [category, setCategory] = useState('General')
     const [paidByUserId, setPaidByUserId] = useState('')
@@ -270,6 +273,9 @@ export default function CreateExpense() {
             if (data.total !== null) {
                 setAmount(data.total)
                 setRawAmount(String(data.total))
+                // A total off the receipt covers tax and service the items don't,
+                // so it outranks the running item sum from here on.
+                setAmountTouched(true)
             } else {
                 alert('Could not detect a total on this receipt. Please enter the amount manually.')
             }
@@ -369,6 +375,24 @@ export default function CreateExpense() {
     }
     const hasLineItems = lineItems.length > 0
     const allItemsHaveParticipants = lineItems.every((item) => item.participantIds.length > 0)
+    const lineItemsSum = lineItems.reduce((s, item) => s + item.amount, 0)
+
+    // Key the items in and the total adds itself up, instead of sitting at 0
+    // waiting to be typed twice. Stops the moment a total is entered by hand.
+    useEffect(() => {
+        if (amountTouched) return
+        setAmount(lineItemsSum)
+        setRawAmount(lineItemsSum > 0 ? lineItemsSum.toFixed(2) : '')
+    }, [lineItemsSum, amountTouched])
+
+    const applyItemsSum = () => {
+        setAmount(lineItemsSum)
+        setRawAmount(lineItemsSum.toFixed(2))
+    }
+    // Once the total is the user's own, an item sum that has drifted away from
+    // it is offered rather than applied.
+    const itemsSumDiffers =
+        hasLineItems && lineItemsSum > 0 && Math.abs(lineItemsSum - amount) >= 0.01
 
     const createExpense = api.expense.create.useMutation({
         onSuccess: async (data) => {
@@ -474,7 +498,9 @@ export default function CreateExpense() {
     }
 
     const splitSummary = (): string => {
-        if (hasLineItems) return 'Totals from receipt items'
+        if (hasLineItems) {
+            return scannedLineItems.length > 0 ? 'Totals from receipt items' : 'Totals from items'
+        }
         if (splitMode === 'even') {
             return checkedCount > 0 && amount > 0
                 ? `$${splitAmount.toFixed(2)} each · ${checkedCount} of ${users.length} selected`
@@ -505,6 +531,15 @@ export default function CreateExpense() {
 
     const hasOp = /[+*/]/.test(rawAmount) || rawAmount.slice(1).includes('-')
     const exprPreview = hasOp ? evalExpr(rawAmount) : null
+
+    const toolbarButton: React.CSSProperties = {
+        display: 'flex', alignItems: 'center', gap: '0.375rem',
+        background: 'none', border: '1px solid var(--border-2)',
+        borderRadius: '6px', padding: '0.3125rem 0.625rem',
+        fontSize: '0.75rem', fontFamily: 'var(--font-ui), sans-serif',
+        transition: 'color 0.15s, border-color 0.15s',
+        whiteSpace: 'nowrap',
+    }
 
     const stepperButton: React.CSSProperties = {
         width: '24px',
@@ -563,26 +598,33 @@ export default function CreateExpense() {
                             <span style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
                                 Expense details
                             </span>
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={scanReceipt.isPending}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.375rem',
-                                    background: 'none', border: '1px solid var(--border-2)',
-                                    borderRadius: '6px', padding: '0.3125rem 0.625rem',
-                                    color: scanReceipt.isPending ? 'var(--muted)' : 'var(--dim)',
-                                    fontSize: '0.75rem', fontFamily: 'var(--font-ui), sans-serif',
-                                    cursor: scanReceipt.isPending ? 'default' : 'pointer',
-                                    transition: 'color 0.15s, border-color 0.15s',
-                                }}
-                            >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                                    <circle cx="12" cy="13" r="4"/>
-                                </svg>
-                                {scanReceipt.isPending ? 'Scanning…' : 'Scan receipt'}
-                            </button>
+                            <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
+                                {!hasLineItems && (
+                                    <button
+                                        type="button"
+                                        onClick={addLineItem}
+                                        style={{ ...toolbarButton, color: 'var(--dim)', cursor: 'pointer' }}
+                                    >
+                                        <span style={{ fontSize: '0.9375rem', lineHeight: 1 }}>+</span> Items
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={scanReceipt.isPending}
+                                    style={{
+                                        ...toolbarButton,
+                                        color: scanReceipt.isPending ? 'var(--muted)' : 'var(--dim)',
+                                        cursor: scanReceipt.isPending ? 'default' : 'pointer',
+                                    }}
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                        <circle cx="12" cy="13" r="4"/>
+                                    </svg>
+                                    {scanReceipt.isPending ? 'Scanning…' : 'Scan receipt'}
+                                </button>
+                            </div>
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -635,6 +677,7 @@ export default function CreateExpense() {
                                     value={rawAmount}
                                     onChange={(e) => {
                                         const raw = e.target.value
+                                        setAmountTouched(true)
                                         setRawAmount(raw)
                                         const result = evalExpr(raw)
                                         setAmount(result !== null && result >= 0 ? result : parseFloat(raw) || 0)
@@ -685,6 +728,27 @@ export default function CreateExpense() {
                                 }}>
                                     = {exprPreview.toFixed(2)}
                                 </div>
+                            )}
+                            {itemsSumDiffers && (
+                                <button
+                                    type="button"
+                                    onClick={applyItemsSum}
+                                    style={{
+                                        display: 'block',
+                                        margin: '0.375rem auto 0',
+                                        background: 'none',
+                                        border: 'none',
+                                        padding: 0,
+                                        color: 'var(--dim)',
+                                        fontSize: '0.75rem',
+                                        fontFamily: 'var(--font-ui), sans-serif',
+                                        cursor: 'pointer',
+                                        textDecoration: 'underline',
+                                        textUnderlineOffset: '2px',
+                                    }}
+                                >
+                                    Items add up to {currency} {lineItemsSum.toFixed(2)} — use that
+                                </button>
                             )}
                         </div>
 
@@ -826,7 +890,7 @@ export default function CreateExpense() {
                         <div className="card-dark anim-fade-up d-1" style={{ marginBottom: '1rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
                                 <span style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem' }}>
-                                    Receipt items
+                                    {scannedLineItems.length > 0 ? 'Receipt items' : 'Items'}
                                 </span>
                                 <button
                                     type="button"
@@ -891,6 +955,7 @@ export default function CreateExpense() {
                                         {/* Name — grows */}
                                         <input
                                             type="text"
+                                            aria-label="Item name"
                                             value={item.name}
                                             onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
                                             style={{
@@ -912,6 +977,7 @@ export default function CreateExpense() {
                                             inputMode="decimal"
                                             min="0"
                                             step="0.01"
+                                            aria-label="Item amount"
                                             value={item.amount || ''}
                                             onChange={(e) => updateLineItem(item.id, { amount: parseFloat(e.target.value) || 0 })}
                                             className="font-mono no-spinner"
