@@ -1,42 +1,8 @@
 import { test, expect } from './fixtures'
 import { makeMinimalJpeg } from './helpers/fake-image'
+import { mockScanSuccess, mockStreamedError } from './helpers/trpc-stream'
 
 const TRPC_ROUTE_PATTERN = '**/api/trpc/receipt.scan**'
-
-// httpBatchStreamLink uses 2-line JSONL (superjson-serialized):
-//   Line 1 (head):  {"json":{"0":[[0],[null,0,0]]}}   — promise placeholder [chunkId=0]
-//   Line 2 (chunk): {"json":[0,0,[[<result>]]]}        — promise fulfilled [chunkId, STATUS_FULFILLED, dehydrated]
-// The head "0":[[placeholder],[null, CHUNK_TYPE_PROMISE=0, chunkId=0]] signals a pending promise.
-// The chunk [0, 0(fulfilled), [[data]]] resolves that promise with data.
-const HEAD_LINE = JSON.stringify({ json: { '0': [[0], [null, 0, 0]] } }) + '\n'
-
-function mockScanSuccess(total: number | null): string {
-  const chunk =
-    JSON.stringify({ json: [0, 0, [[{ result: { data: { total, items: [] } } }]]] }) + '\n'
-  return HEAD_LINE + chunk
-}
-
-function mockScanError(): string {
-  const chunk =
-    JSON.stringify({
-      json: [
-        0,
-        0,
-        [
-          [
-            {
-              error: {
-                message: 'Internal server error',
-                code: -32603,
-                data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 },
-              },
-            },
-          ],
-        ],
-      ],
-    }) + '\n'
-  return HEAD_LINE + chunk
-}
 
 test.describe('Receipt scan feature', () => {
   test.beforeEach(async ({ page, groupId }) => {
@@ -56,7 +22,7 @@ test.describe('Receipt scan feature', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: mockScanSuccess(42.5),
+        body: mockScanSuccess({ total: 42.5 }),
       })
     })
 
@@ -77,7 +43,7 @@ test.describe('Receipt scan feature', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: mockScanSuccess(null),
+        body: mockScanSuccess({ total: null }),
       })
     })
 
@@ -104,7 +70,7 @@ test.describe('Receipt scan feature', () => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
-        body: mockScanError(),
+        body: mockStreamedError(),
       })
     })
 
@@ -129,7 +95,7 @@ test.describe('Receipt scan feature', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: mockScanSuccess(10.0),
+        body: mockScanSuccess({ total: 10.0 }),
       })
     })
 

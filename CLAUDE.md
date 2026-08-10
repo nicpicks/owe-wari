@@ -46,8 +46,8 @@ All tables are prefixed `owe-wari_` (multi-project schema). Key relationships:
 ### tRPC API (`src/server/api/`)
 Three routers exposed at `/api/trpc`:
 - `group` — `create`, `getGroup`, `getUsers`, `addMember`, `getCurrencies`, `getDefaultPayee`, `updateDefaultPayee`, `updateTripLink`
-- `expense` — `create`, `update` (writes an `expense_audits` row when fields change), `delete` (soft delete), `getExpense`, `getExpenses` (filters out deleted), `getTotalExpenseCost`, `getBalances`, `settleUp` (accepts per-currency lines), `getHistory` (unified feed of expense / settlement / edit / delete events)
-- `receipt` — `scan` (Gemini-based receipt parsing for prefilling expense forms)
+- `expense` — `create`, `update` (writes an `expense_audits` row when fields change), `delete` (soft delete), `getExpense`, `getExpenses` (filters out deleted), `getTotalExpenseCost`, `getBalances`, `settleUp` (accepts per-currency lines), `getHistory` (unified feed of expense / settlement / edit / delete events), `getCategoryHints` (past title→category pairs for this group, feeding the category suggestion)
+- `receipt` — `scan` (Claude Haiku receipt parsing for prefilling expense forms; returns total, line items and a suggested category)
 
 `getBalances` returns one row per `(user, currency)` pair with non-zero balance — netting paid expenses, owed splits, and settlement amounts.
 
@@ -62,6 +62,15 @@ The expense form offers four ways to split: **Even**, **Portions** (relative sha
 Portions and percentages become amounts via `allocateByWeight` (`src/lib/split-allocation.ts`), a largest-remainder allocator working in whole cents, so per-user splits always sum to the expense total exactly.
 
 Line items (from a receipt scan, or started by hand with the "+ Items" button) override the mode toggle: each item is split among the members tapped on its row. They also add themselves up into the hero total, until a total is typed by hand or read off a receipt — after that the total is the user's, and a drifting item sum is only offered ("Items add up to … — use that"), never applied.
+
+### Category suggestions (`src/lib/categorize.ts`)
+The create form offers a category for the title being typed, as a tap-to-accept chip under the Category dropdown — it never sets the field itself, and it goes quiet for good once the user picks a category by hand. Three guessers, in priority order:
+
+1. **The receipt scan** — `receipt.scan` already calls Claude to read the image, so the category rides along in the same response at no extra cost or latency.
+2. **Group history** — `suggestFromHistory` over `expense.getCategoryHints`. A group's own vocabulary beats any built-in list and needs no English (a past "Konbini" categorised Groceries twice teaches it). Exact title repeats are trusted; looser word-overlap matches need two prior uses and a two-thirds majority.
+3. **Built-in rules** — `suggestFromRules`, a phrase table matched on whole words, longest phrase wins (so "grab dinner" is Food while "grab" is Transport).
+
+All three stay silent when unsure: no match, a tie between equally specific rules ("hotel bar"), or a category the group splits on produces no suggestion. That is deliberate — a wrong category is worse than none, because nobody proofreads the dropdown and the error only surfaces later on the totals page. Convenience stores are left out of the rule table for exactly this reason.
 
 ### Frontend (`src/app/`)
 - Pages are under `src/app/groups/[groupId]/` with tabs: summary, expenses, balances, history, settings

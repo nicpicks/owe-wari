@@ -205,6 +205,47 @@ export const expenseRouter = createTRPCRouter({
             }
         }),
 
+    /**
+     * What this group has called things before, and how they categorised them.
+     * Feeds the category suggestion on the create form — the group's own
+     * vocabulary is a better guesser than any built-in word list. 'General' is
+     * the untouched default, so it carries no signal and is left out.
+     */
+    getCategoryHints: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const rows = await ctx.db
+                    .select({
+                        title: sql<string>`lower(btrim(${expenses.title}))`,
+                        category: expenses.category,
+                        count: sql<number>`count(*)::int`,
+                    })
+                    .from(expenses)
+                    .where(
+                        and(
+                            eq(expenses.groupId, input.groupId),
+                            notDeleted,
+                            isNotNull(expenses.category),
+                            sql`${expenses.category} <> 'General'`
+                        )
+                    )
+                    .groupBy(sql`lower(btrim(${expenses.title}))`, expenses.category)
+                    .orderBy(sql`count(*) desc`)
+                    .limit(200)
+                    .execute()
+
+                return rows.map((r) => ({
+                    title: r.title,
+                    category: r.category ?? '',
+                    count: r.count,
+                }))
+            } catch (error) {
+                console.error('Error getting category hints:', error)
+                throw new Error('Failed to get category hints')
+            }
+        }),
+
     getHistory: publicProcedure
         .input(z.object({ groupId: z.string().min(1) }))
         .query(async ({ ctx, input }) => {

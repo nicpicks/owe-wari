@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '~/trpc/react'
+import { CATEGORIES, suggestFromHistory, suggestFromRules } from '~/lib/categorize'
 import { allocateByWeight, evenPercents } from '~/lib/split-allocation'
 import { useGroupIdentity } from './use-group-identity'
 
@@ -190,6 +191,9 @@ export default function CreateExpense() {
     const [amountTouched, setAmountTouched] = useState(false)
     const [expenseDate, setExpenseDate] = useState(new Date())
     const [category, setCategory] = useState('General')
+    // A category the user picked themselves is final — no more suggestions.
+    const [categoryTouched, setCategoryTouched] = useState(false)
+    const [scanCategory, setScanCategory] = useState<string | null>(null)
     const [paidByUserId, setPaidByUserId] = useState('')
     const [notes, setNotes] = useState('')
     const [users, setUsers] = useState<User[]>([])
@@ -218,6 +222,11 @@ export default function CreateExpense() {
     const { data: usersData, error: usersError } = api.group.getUsers.useQuery(
         { groupId: groupId ?? '' },
         { enabled: !!groupId }
+    )
+
+    const { data: categoryHints } = api.expense.getCategoryHints.useQuery(
+        { groupId: groupId ?? '' },
+        { enabled: !!groupId, staleTime: 5 * 60_000 }
     )
 
     const { data: groupCurrenciesData } = api.group.getCurrencies.useQuery(
@@ -279,6 +288,7 @@ export default function CreateExpense() {
             } else {
                 alert('Could not detect a total on this receipt. Please enter the amount manually.')
             }
+            if (data.category) setScanCategory(data.category)
             if (data.items.length > 0) {
                 const scanned = data.items.map((item, i) => ({
                     id: String(i),
@@ -384,6 +394,16 @@ export default function CreateExpense() {
         setAmount(lineItemsSum)
         setRawAmount(lineItemsSum > 0 ? lineItemsSum.toFixed(2) : '')
     }, [lineItemsSum, amountTouched])
+
+    // What the group has called this before beats the built-in word list, and a
+    // receipt the model actually read beats both. Offered as a tap, never
+    // applied — an ambiguous title gets silence rather than a coin flip.
+    const categoryGuess = categoryTouched
+        ? null
+        : scanCategory
+            ?? suggestFromHistory(title, categoryHints ?? [])
+            ?? suggestFromRules(title)
+    const suggestedCategory = categoryGuess && categoryGuess !== category ? categoryGuess : null
 
     const applyItemsSum = () => {
         setAmount(lineItemsSum)
@@ -783,12 +803,40 @@ export default function CreateExpense() {
                                 <select
                                     className="field-select"
                                     value={category}
-                                    onChange={(e) => setCategory(e.target.value)}
+                                    onChange={(e) => {
+                                        setCategoryTouched(true)
+                                        setCategory(e.target.value)
+                                    }}
                                 >
-                                    {['General', 'Food', 'Transport', 'Stay', 'Groceries', 'Activities', 'Others'].map((c) => (
+                                    {CATEGORIES.map((c) => (
                                         <option key={c} value={c}>{c}</option>
                                     ))}
                                 </select>
+                                {suggestedCategory && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setCategory(suggestedCategory)}
+                                        aria-label={`Use suggested category ${suggestedCategory}`}
+                                        style={{
+                                            alignSelf: 'flex-start',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem',
+                                            background: 'none',
+                                            border: '1px dashed var(--border-2)',
+                                            borderRadius: '999px',
+                                            padding: '0.1875rem 0.5rem',
+                                            color: 'var(--amber)',
+                                            fontSize: '0.6875rem',
+                                            fontFamily: 'var(--font-ui), sans-serif',
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        <span style={{ color: 'var(--muted)' }}>Use</span>
+                                        {suggestedCategory}
+                                    </button>
+                                )}
                             </div>
 
                             <div className="field-group" style={{ gridColumn: '1 / -1' }}>
