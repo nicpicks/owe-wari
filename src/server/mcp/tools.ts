@@ -152,6 +152,39 @@ export const mcpTools = {
             api.group.updateCurrencies(input),
     },
 
+    get_households: {
+        description:
+            'List the households in a group — couples, families or flats that settle as one wallet. Members of a household net out against each other before the group settles up, so pair this with get_balances when working out who should pay whom.',
+        inputSchema: { groupId: groupIdSchema },
+        handler: async ({ groupId }: { groupId: string }) =>
+            api.group.getHouseholds({ groupId }),
+    },
+
+    save_household: {
+        description:
+            "Create a household, or replace an existing one's name and membership. CONFIRM WITH THE USER before calling. Pass the FULL member list — anyone omitted leaves the household, and anyone included is moved out of the household they were in before (a person belongs to one household at a time). Omit `name` to let it default to the members' names joined with '&'. Use get_households first to see what exists.",
+        inputSchema: {
+            groupId: groupIdSchema,
+            householdId: z
+                .number()
+                .int()
+                .positive()
+                .optional()
+                .describe('Household to update; omit to create a new one'),
+            name: z.string().optional(),
+            userIds: z
+                .array(z.string().length(26))
+                .min(2)
+                .describe('The complete list of member ULIDs in this household'),
+        },
+        handler: async (input: {
+            groupId: string
+            householdId?: number
+            name?: string
+            userIds: string[]
+        }) => api.group.saveHousehold({ ...input, name: input.name ?? '' }),
+    },
+
     add_member: {
         description: "Add a new member to a group by name. CONFIRM WITH THE USER before calling. Returns the new member's ID and name.",
         inputSchema: {

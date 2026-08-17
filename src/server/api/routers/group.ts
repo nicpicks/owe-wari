@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
 import {
@@ -8,6 +8,8 @@ import {
     groupMembers,
     groupCurrencies,
     groupRates,
+    households,
+    householdMembers,
 } from '~/server/db/schema'
 import { isSupportedCurrency } from '~/lib/currencies'
 import { ulid } from 'ulid'
@@ -406,6 +408,201 @@ export const groupRouter = createTRPCRouter({
             } catch (error) {
                 console.error('Error updating trip link', error)
                 throw new Error('Failed to update trip link')
+            }
+        }),
+
+    /**
+     * Households in this group — couples, families or flats that settle as one
+     * wallet. Members come back with their names so the balances page can label
+     * a transfer without a second round-trip.
+     */
+    getHouseholds: publicProcedure
+        .input(z.object({ groupId: z.string() }))
+        .query(async ({ ctx, input }) => {
+            try {
+                const rows = await ctx.db
+                    .select({
+                        id: households.id,
+                        name: households.name,
+                        userId: users.id,
+                        userName: users.name,
+                    })
+                    .from(households)
+                    .leftJoin(
+                        householdMembers,
+                        eq(householdMembers.householdId, households.id)
+                    )
+                    .leftJoin(users, eq(users.id, householdMembers.userId))
+                    .where(eq(households.groupId, input.groupId))
+                    .orderBy(households.id)
+                    .execute()
+
+                const byId = new Map<
+                    number,
+                    { id: number; name: string; members: { userId: string; name: string }[] }
+                >()
+                for (const row of rows) {
+                    let household = byId.get(row.id)
+                    if (!household) {
+                        household = { id: row.id, name: row.name, members: [] }
+                        byId.set(row.id, household)
+                    }
+                    if (row.userId && row.userName) {
+                        household.members.push({ userId: row.userId, name: row.userName })
+                    }
+                }
+
+                return Array.from(byId.values())
+            } catch (error) {
+                console.error('Error fetching households:', error)
+                throw new Error('Failed to fetch households')
+            }
+        }),
+
+    /**
+     * Create or rename a household and set exactly who is in it. Membership is
+     * exclusive: anyone picked here is pulled out of whatever household they
+     * were in before, so the group's members never double-count.
+     */
+    saveHousehold: publicProcedure
+        .input(
+            z.object({
+                groupId: z.string(),
+                /** Omit to create a new household. */
+                householdId: z.number().int().positive().optional(),
+                name: z.string().trim().max(256),
+                userIds: z.array(z.string()).min(2),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const userIds = Array.from(new Set(input.userIds))
+
+            const memberRows = await ctx.db
+                .select({ userId: groupMembers.userId, name: users.name })
+                .from(groupMembers)
+                .innerJoin(users, eq(users.id, groupMembers.userId))
+                .where(eq(groupMembers.groupId, input.groupId))
+                .execute()
+
+            const nameById = new Map(memberRows.map((m) => [m.userId, m.name]))
+            const strangers = userIds.filter((id) => !nameById.has(id))
+            if (strangers.length > 0) {
+                throw new Error('Everyone in a household must be a member of the group')
+            }
+
+            // "Wei Yong & Wei Qing" beats "Household 2" when nothing was typed
+            const name =
+                input.name ||
+                userIds.map((id) => nameById.get(id)!).join(' & ').slice(0, 256)
+
+            try {
+                return await ctx.db.transaction(async (tx) => {
+                    let householdId: number
+
+                    if (input.householdId) {
+                        householdId = input.householdId
+                        const updated = await tx
+                            .update(households)
+                            .set({ name, updatedAt: new Date() })
+                            .where(
+                                and(
+                                    eq(households.id, householdId),
+                                    eq(households.groupId, input.groupId)
+                                )
+                            )
+                            .returning({ id: households.id })
+                        if (updated.length === 0) {
+                            throw new Error('No household found with the provided ID')
+                        }
+                        await tx
+                            .delete(householdMembers)
+                            .where(eq(householdMembers.householdId, householdId))
+                    } else {
+                        const [created] = await tx
+                            .insert(households)
+                            .values({ groupId: input.groupId, name })
+                            .returning({ id: households.id })
+                        householdId = created!.id
+                    }
+
+                    // A person lives in one household at a time
+                    await tx
+                        .delete(householdMembers)
+                        .where(
+                            and(
+                                eq(householdMembers.groupId, input.groupId),
+                                inArray(householdMembers.userId, userIds)
+                            )
+                        )
+
+                    await tx.insert(householdMembers).values(
+                        userIds.map((userId) => ({
+                            householdId,
+                            groupId: input.groupId,
+                            userId,
+                        }))
+                    )
+
+                    // Pulling someone into a new household can strand the one
+                    // they left — a household of one settles like a person, so
+                    // it is cleaned up rather than lingering in the editor.
+                    const counts = await tx
+                        .select({
+                            id: households.id,
+                            memberCount: sql<string>`COUNT(${householdMembers.id})`,
+                        })
+                        .from(households)
+                        .leftJoin(
+                            householdMembers,
+                            eq(householdMembers.householdId, households.id)
+                        )
+                        .where(eq(households.groupId, input.groupId))
+                        .groupBy(households.id)
+                        .execute()
+
+                    const stranded = counts
+                        .filter((h) => parseInt(h.memberCount, 10) < 2)
+                        .map((h) => h.id)
+                    if (stranded.length > 0) {
+                        await tx
+                            .delete(householdMembers)
+                            .where(inArray(householdMembers.householdId, stranded))
+                        await tx
+                            .delete(households)
+                            .where(inArray(households.id, stranded))
+                    }
+
+                    return { success: true, id: householdId, name }
+                })
+            } catch (error) {
+                console.error('Error saving household:', error)
+                throw new Error(
+                    error instanceof Error ? error.message : 'Failed to save household'
+                )
+            }
+        }),
+
+    deleteHousehold: publicProcedure
+        .input(z.object({ groupId: z.string(), householdId: z.number().int().positive() }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                await ctx.db.transaction(async (tx) => {
+                    await tx
+                        .delete(householdMembers)
+                        .where(eq(householdMembers.householdId, input.householdId))
+                    await tx
+                        .delete(households)
+                        .where(
+                            and(
+                                eq(households.id, input.householdId),
+                                eq(households.groupId, input.groupId)
+                            )
+                        )
+                })
+                return { success: true }
+            } catch (error) {
+                console.error('Error deleting household:', error)
+                throw new Error('Failed to delete household')
             }
         }),
 })

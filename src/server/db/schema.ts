@@ -111,6 +111,59 @@ export const groupRates = createTable(
     })
 )
 
+/**
+ * A couple, family or flat inside a group. Members of a household net out
+ * against each other before the group settles, so they hand over one figure
+ * instead of two and square up between themselves at home.
+ */
+export const households = createTable(
+    'households',
+    {
+        id: serial('id').primaryKey().notNull(),
+        groupId: varchar('group_id', { length: 26 })
+            .references(() => groups.id)
+            .notNull(),
+        name: varchar('name', { length: 256 }).notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+        updatedAt: timestamp('updated_at', { withTimezone: true }).default(
+            sql`CURRENT_TIMESTAMP`
+        ),
+    },
+    (t) => ({
+        groupIdIdx: index('idx_households_group_id').on(t.groupId),
+    })
+)
+
+export const householdMembers = createTable(
+    'household_members',
+    {
+        id: serial('id').primaryKey().notNull(),
+        householdId: integer('household_id')
+            .references(() => households.id, { onDelete: 'cascade' })
+            .notNull(),
+        // Denormalized so one person can belong to at most one household per
+        // group, enforced by the unique index below rather than in app code.
+        groupId: varchar('group_id', { length: 26 })
+            .references(() => groups.id)
+            .notNull(),
+        userId: varchar('user_id', { length: 26 })
+            .references(() => users.id)
+            .notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true })
+            .default(sql`CURRENT_TIMESTAMP`)
+            .notNull(),
+    },
+    (t) => ({
+        householdIdIdx: index('idx_household_members_household_id').on(t.householdId),
+        groupUserIdx: uniqueIndex('idx_household_members_group_user').on(
+            t.groupId,
+            t.userId
+        ),
+    })
+)
+
 export const expenses = createTable(
     'expenses',
     {
