@@ -42,10 +42,11 @@ All tables are prefixed `owe-wari_` (multi-project schema). Key relationships:
 - `expenses` → has its own `currency` (one of the group's enabled currencies), `paidByUserId`, `createdByUserId` (snapshot of paidBy at creation, never updated; used as audit actor), and a nullable `deletedAt` (soft delete). Split via `expense_splits` (one row per user per expense).
 - `settlements` → records a payment from `payerId` to `receiverId` in a specific `currency` to clear debt
 - `expense_audits` → one row per expense edit, with `actorId` (= the expense's `createdByUserId` at edit time) and `fieldsChanged` (text[])
+- `households` → a couple, family or flat inside a group, with members in `household_members`. A unique index on `(group_id, user_id)` keeps a person in at most one household per group. Nothing else in the data model knows about them — they only change how the balances page groups the same balances.
 
 ### tRPC API (`src/server/api/`)
 Three routers exposed at `/api/trpc`:
-- `group` — `create`, `getGroup`, `getUsers`, `addMember`, `getCurrencies`, `getDefaultPayee`, `updateDefaultPayee`, `updateTripLink`
+- `group` — `create`, `getGroup`, `getUsers`, `addMember`, `getCurrencies`, `getDefaultPayee`, `updateDefaultPayee`, `updateTripLink`, `getRates`/`setRate`/`deleteRate`, `getHouseholds`/`saveHousehold` (full-membership replace, exclusive)/`deleteHousehold`
 - `expense` — `create`, `update` (writes an `expense_audits` row when fields change), `delete` (soft delete), `getExpense`, `getExpenses` (filters out deleted), `getTotalExpenseCost`, `getBalances`, `settleUp` (accepts per-currency lines), `getHistory` (unified feed of expense / settlement / edit / delete events), `getCategoryHints` (past title→category pairs for this group, feeding the category suggestion)
 - `receipt` — `scan` (Claude Haiku receipt parsing for prefilling expense forms; returns total, line items and a suggested category)
 
@@ -54,7 +55,13 @@ Three routers exposed at `/api/trpc`:
 `getHistory` fans out three parallel selects (expenses, settlements, expense_audits) joined to `users` for actor/receiver names, merges in JS, sorts newest-first. No N+1.
 
 ### Debt simplification (`src/lib/simplify-debts.ts`)
-`simplifyDebts(balances)` runs a greedy min-cash-flow algorithm on the `Balance[]` returned by `getBalances`, reducing N debts to at most N−1 transfers. Used client-side on the balances page.
+The balances page runs three passes over the `Balance[]` from `getBalances`, all client-side:
+
+1. **`netBalances(balances, settleCurrency, rates)`** folds every currency into the group's default at its agreed rate and nets each person down to one number. This has to come first: simplifying currency by currency is what left a pair owing each other in opposite directions (Rp one way, S$ the other) instead of subtracting to a single figure.
+2. **`simplifyDebts(netted)`** — greedy min-cash-flow, reducing N debts to at most N−1 transfers.
+3. **`simplifyHouseholdDebts(netted, households)`** — the same pass run over households instead of people, so a couple's two balances collapse into one before anyone pays. It picks each household's payer as the member deepest in debt and its receiver as the member owed most, so the settlement is recorded against whoever was already carrying the balance. Intra-household debt is simply left alone — they square up at home, and switching the balances page back to **People** still shows the true individual books.
+
+Rounding dust from FX conversion and split allocation is absorbed into the largest creditor, so every debtor pays exactly the figure shown against their name.
 
 ### Split modes (`src/app/_components/create-expense.tsx`)
 The expense form offers four ways to split: **Even**, **Portions** (relative shares — a bigger eater takes 2, someone who skipped takes 0), **%**, and **Manual**. They live in the `SPLIT_MODES` array; each entry supplies a `validate` (gates the submit button) and a `toPayload` (returns `splitUserIds` for the even split, or explicit `splitAmounts`). Adding a mode means adding an array entry plus its row UI — no API change.
@@ -71,6 +78,11 @@ The create form offers a category for the title being typed, as a tap-to-accept 
 3. **Built-in rules** — `suggestFromRules`, a phrase table matched on whole words, longest phrase wins (so "grab dinner" is Food while "grab" is Transport).
 
 All three stay silent when unsure: no match, a tie between equally specific rules ("hotel bar"), or a category the group splits on produces no suggestion. That is deliberate — a wrong category is worse than none, because nobody proofreads the dropdown and the error only surfaces later on the totals page. Convenience stores are left out of the rule table for exactly this reason.
+
+### Households (`src/app/_components/households-card.tsx`)
+Households are edited in group settings and applied on the balances page, where a **People / 家 Households** switch appears once any exist. The switch defaults to on — a household is the group's agreement, not one device's preference — and the off state is kept in `localStorage` (`owe-wari:settle-by-household:<groupId>`) as a per-device peek at the individual books.
+
+A household row leads with the household names, keeps the real payer and receiver on the line beneath ("Dan pays Ana"), and settles as a normal `settleUp` between those two people — the server never sees a household.
 
 ### Frontend (`src/app/`)
 - Pages are under `src/app/groups/[groupId]/` with tabs: summary, expenses, balances, history, settings

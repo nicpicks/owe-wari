@@ -1,22 +1,25 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Tabs from '~/app/_components/tabs'
 import SettleUpModal from '~/app/_components/settle-up-modal'
 import ConversionRateCard from '~/app/_components/conversion-rate-card'
 import { api } from '~/trpc/react'
-import { simplifyDebts, type Transfer } from '~/lib/simplify-debts'
+import { netBalances, simplifyDebts, simplifyHouseholdDebts } from '~/lib/simplify-debts'
 import { formatAmount } from '~/lib/format-currency'
-import { toDefaultCurrency } from '~/lib/fx-rates'
+import { fromDefaultCurrency } from '~/lib/fx-rates'
 
 interface PendingSettle {
     fromUserId: string
     fromName: string
     toUserId: string
     toName: string
+    note?: string
     lines: { currency: string; amount: number }[]
 }
+
+const householdPrefKey = (groupId: string) => `owe-wari:settle-by-household:${groupId}`
 
 const BalancesTab = () => {
     const router = useRouter()
@@ -36,6 +39,10 @@ const BalancesTab = () => {
         { enabled: !!groupId }
     )
     const { data: rates } = api.group.getRates.useQuery(
+        { groupId },
+        { enabled: !!groupId }
+    )
+    const { data: households } = api.group.getHouseholds.useQuery(
         { groupId },
         { enabled: !!groupId }
     )
@@ -59,6 +66,30 @@ const BalancesTab = () => {
     const [justSettled, setJustSettled] = useState<
         { key: string; fromName: string; toName: string; amountStr: string }[]
     >([])
+
+    // Households are the group's agreement, so the switch defaults to on once
+    // any exist; turning it off is a per-device peek at the individual books.
+    const [householdPref, setHouseholdPref] = useState<boolean | null>(null)
+    useEffect(() => {
+        if (!groupId) return
+        try {
+            setHouseholdPref(window.localStorage.getItem(householdPrefKey(groupId)) !== 'off')
+        } catch {
+            setHouseholdPref(true)
+        }
+    }, [groupId])
+
+    const hasHouseholds = (households?.length ?? 0) > 0
+    const byHousehold = hasHouseholds && householdPref !== false
+
+    const setByHousehold = (next: boolean) => {
+        setHouseholdPref(next)
+        try {
+            window.localStorage.setItem(householdPrefKey(groupId), next ? 'on' : 'off')
+        } catch {
+            /* ignore quota / private mode errors */
+        }
+    }
 
     const settleUp = api.expense.settleUp.useMutation({
         onSuccess: async (_data, vars) => {
@@ -85,26 +116,27 @@ const BalancesTab = () => {
         },
     })
 
-    // Group transfers by (from, to) pair, with one or more per-currency lines per pair.
-    const transfersByPair = useMemo(() => {
-        const byPair = new Map<string, Transfer[]>()
-        if (!balances) return byPair
-        const currencies = Array.from(new Set(balances.map((b) => b.currency)))
-        for (const code of currencies) {
-            const subset = balances.filter((b) => b.currency === code)
-            const transfers = simplifyDebts(subset)
-            for (const t of transfers) {
-                const key = `${t.from}|${t.to}`
-                const arr = byPair.get(key) ?? []
-                arr.push(t)
-                byPair.set(key, arr)
-            }
-        }
-        return byPair
-    }, [balances])
+    // Every currency folds into the group's settle currency first, so a pair
+    // never ends up owing each other in two directions at once.
+    const netted = useMemo(
+        () => netBalances(balances ?? [], defaultCurrency, rates),
+        [balances, defaultCurrency, rates]
+    )
 
-    const allTransferKeys = Array.from(transfersByPair.keys())
-    const stampedRows = justSettled.filter((s) => !transfersByPair.has(s.key))
+    const soloTransfers = useMemo(() => simplifyDebts(netted), [netted])
+    const householdTransfers = useMemo(
+        () => (hasHouseholds ? simplifyHouseholdDebts(netted, households ?? []) : []),
+        [netted, households, hasHouseholds]
+    )
+    const transfers = byHousehold ? householdTransfers : soloTransfers
+    const saved = soloTransfers.length - householdTransfers.length
+
+    const openTransfers = new Set(transfers.map((t) => `${t.from}|${t.to}`))
+    const stampedRows = justSettled.filter((s) => !openTransfers.has(s.key))
+
+    // With one foreign currency still live, quoting the cash equivalent saves
+    // the payer doing the sum at the ATM.
+    const cashCode = activeCodes.length === 1 ? activeCodes[0]! : null
 
     return (
         <div className="page-shell">
@@ -128,10 +160,63 @@ const BalancesTab = () => {
                                 ? 'Loading…'
                                 : isError
                                     ? 'Could not load — try refreshing'
-                                    : allTransferKeys.length === 0
+                                    : transfers.length === 0
                                         ? 'Everyone is all square'
-                                        : `${allTransferKeys.length} pair${allTransferKeys.length !== 1 ? 's' : ''} to settle · tap to stamp it paid`}
+                                        : `${transfers.length} transfer${transfers.length !== 1 ? 's' : ''} to settle · tap to stamp it paid`}
                         </div>
+
+                        {hasHouseholds && (
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.625rem',
+                                    flexWrap: 'wrap',
+                                    marginTop: '0.75rem',
+                                }}
+                            >
+                                <div
+                                    role="group"
+                                    aria-label="Settle as"
+                                    style={{
+                                        display: 'flex',
+                                        border: '1px solid var(--border-2)',
+                                        borderRadius: '6px',
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    {[
+                                        { key: 'people', label: 'People', on: !byHousehold },
+                                        { key: 'households', label: '家 Households', on: byHousehold },
+                                    ].map(({ key, label, on }) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            aria-pressed={on}
+                                            onClick={() => setByHousehold(key === 'households')}
+                                            style={{
+                                                padding: '0.25rem 0.625rem',
+                                                fontSize: '0.75rem',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontFamily: 'var(--font-ui), sans-serif',
+                                                background: on ? 'var(--surface-3)' : 'none',
+                                                color: on ? 'var(--heading)' : 'var(--dim)',
+                                                transition: 'background 0.15s, color 0.15s',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {byHousehold && saved > 0 && (
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--green)' }}>
+                                        {saved} fewer transfer{saved !== 1 ? 's' : ''}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {isError && (
@@ -140,40 +225,47 @@ const BalancesTab = () => {
                         </p>
                     )}
 
-                    {allTransferKeys.map((key) => {
-                        const transfers = transfersByPair.get(key)!
-                        const first = transfers[0]!
-                        const lines = transfers.map((t) => ({ currency: t.currency, amount: t.amount }))
-                        const originalStr = transfers
-                            .map((t) => formatAmount(t.amount, t.currency))
-                            .join(' + ')
-                        // With foreign debts in the mix, lead with the single
-                        // default-currency figure the payer actually hands over.
-                        const hasForeign = transfers.some((t) => t.currency !== defaultCurrency)
-                        const convertedTotal = transfers.reduce(
-                            (sum, t) => sum + toDefaultCurrency(t.amount, t.currency, defaultCurrency, rates),
-                            0
-                        )
+                    {transfers.map((transfer) => {
+                        const key = `${transfer.from}|${transfer.to}`
+                        const fromLabel = transfer.fromHousehold?.name ?? transfer.fromName
+                        const toLabel = transfer.toHousehold?.name ?? transfer.toName
+                        const isPooled = !!(transfer.fromHousehold ?? transfer.toHousehold)
+                        const handoff = `${transfer.fromName} pays ${transfer.toName}`
+                        const cash = cashCode
+                            ? fromDefaultCurrency(transfer.amount, cashCode, defaultCurrency, rates)
+                            : null
                         return (
                             <div key={key} className="ledger-row">
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: '0.9375rem', color: 'var(--body)', display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
-                                        <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{first.fromName}</span>
-                                        <span style={{ color: 'var(--muted)', fontSize: '0.8125rem' }}>→</span>
-                                        <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{first.toName}</span>
-                                    </div>
-                                    {hasForeign ? (
-                                        <>
-                                            <div className="font-mono" style={{ fontSize: '0.9375rem', color: 'var(--amber)', marginTop: '0.1875rem' }}>
-                                                {formatAmount(convertedTotal, defaultCurrency)}
+                                    {/* Two household names never fit on one phone line,
+                                        so stack them and let the arrow lead the receiver
+                                        rather than dangle at the end of the first */}
+                                    {isPooled ? (
+                                        <div style={{ fontSize: '0.9375rem', lineHeight: 1.45 }}>
+                                            <div style={{ fontWeight: 600, color: 'var(--heading)' }}>{fromLabel}</div>
+                                            <div style={{ fontWeight: 600, color: 'var(--heading)' }}>
+                                                <span style={{ color: 'var(--muted)', fontSize: '0.8125rem' }}>→ </span>
+                                                {toLabel}
                                             </div>
-                                            <div className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.0625rem' }}>
-                                                {originalStr}
-                                            </div>
-                                        </>
+                                        </div>
                                     ) : (
-                                        <div className="font-mono" style={{ fontSize: '0.8125rem', color: 'var(--muted)', marginTop: '0.125rem' }}>
-                                            {originalStr}
+                                        <div style={{ fontSize: '0.9375rem', color: 'var(--body)', display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                                            <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{fromLabel}</span>
+                                            <span style={{ color: 'var(--muted)', fontSize: '0.8125rem' }}>→</span>
+                                            <span style={{ fontWeight: 600, color: 'var(--heading)' }}>{toLabel}</span>
+                                        </div>
+                                    )}
+                                    <div className="font-mono" style={{ fontSize: '0.9375rem', color: 'var(--amber)', marginTop: '0.1875rem' }}>
+                                        {formatAmount(transfer.amount, transfer.currency)}
+                                        {cash !== null && cashCode && (
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--muted)', marginLeft: '0.5rem' }}>
+                                                ≈ {formatAmount(cash, cashCode)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {isPooled && (
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.125rem' }}>
+                                            {handoff}
                                         </div>
                                     )}
                                 </div>
@@ -181,11 +273,12 @@ const BalancesTab = () => {
                                     className="btn-sm-settle"
                                     onClick={() =>
                                         setPending({
-                                            fromUserId: first.from,
-                                            fromName: first.fromName,
-                                            toUserId: first.to,
-                                            toName: first.toName,
-                                            lines,
+                                            fromUserId: transfer.from,
+                                            fromName: transfer.fromName,
+                                            toUserId: transfer.to,
+                                            toName: transfer.toName,
+                                            note: isPooled ? `Settles ${fromLabel} → ${toLabel}` : undefined,
+                                            lines: [{ currency: transfer.currency, amount: transfer.amount }],
                                         })
                                     }
                                 >
@@ -211,6 +304,28 @@ const BalancesTab = () => {
                             <div className="stamp-seal" aria-label="Settled">済</div>
                         </div>
                     ))}
+
+                    {!isLoading && !isError && !hasHouseholds && soloTransfers.length > 2 && (
+                        <div style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+                            Travelling as couples or families?{' '}
+                            <button
+                                type="button"
+                                onClick={() => navigateToTab('settings')}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: 0,
+                                    color: 'var(--amber)',
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline',
+                                }}
+                            >
+                                Pair them up in settings
+                            </button>{' '}
+                            and they settle as one wallet.
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -219,6 +334,7 @@ const BalancesTab = () => {
                 groupId={groupId}
                 fromName={pending?.fromName ?? ''}
                 toName={pending?.toName ?? ''}
+                note={pending?.note}
                 defaultCurrency={defaultCurrency}
                 savedRates={rates}
                 lines={pending?.lines ?? []}

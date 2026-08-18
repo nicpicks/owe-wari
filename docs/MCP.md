@@ -25,6 +25,8 @@ If you change the **input shape** of an existing procedure (rename a field, add 
 | `settle_up` | `expense.settleUp` | yes | Multi-currency `lines` array |
 | `update_currencies` | `group.updateCurrencies` | yes | Full-list replace; default currency cannot be removed |
 | `set_conversion_rate` | `group.setRate` | yes | `rate` is units of `code` per 1 unit of the group default (SGD default + MYR 3.5 → "S$1 = RM3.50"). `group.deleteRate` is intentionally UI-only |
+| `get_households` | `group.getHouseholds` | no | Couples/families that settle as one wallet |
+| `save_household` | `group.saveHousehold` | yes | Full-membership replace; a person belongs to one household at a time. `group.deleteHousehold` is intentionally UI-only |
 | `add_member` | `group.addMember` | yes | |
 
 There is intentionally no `list_all_groups` tool. Group ULIDs are 128 bits of entropy and act as the only access control, so MCP clients must already know the group ID (e.g., from a URL the user shared). The AI assistant is expected to remember known group IDs in its own context/memory.

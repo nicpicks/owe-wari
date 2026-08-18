@@ -16,6 +16,8 @@ interface Props {
     groupId: string
     fromName: string
     toName: string
+    /** Extra context when the payer is settling for a household, not just themselves. */
+    note?: string
     defaultCurrency: string
     /** Rates the group agreed on; used to prefill each line. */
     savedRates: GroupRate[] | undefined
@@ -34,6 +36,7 @@ export default function SettleUpModal({
     groupId,
     fromName,
     toName,
+    note,
     defaultCurrency,
     savedRates,
     lines,
@@ -92,6 +95,12 @@ export default function SettleUpModal({
                 </div>
                 <div className="section-sub" style={{ marginBottom: '1.25rem' }}>
                     {fromName} pays {toName}
+                    {note && (
+                        <>
+                            <br />
+                            {note}
+                        </>
+                    )}
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

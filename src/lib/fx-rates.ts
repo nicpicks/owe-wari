@@ -28,6 +28,11 @@ export function getDefaultRate(from: string, to: string): number {
     if (direct != null) return direct
     const inverse = RATES[to as CurrencyCode]?.[from as CurrencyCode]
     if (inverse != null) return 1 / inverse
+    // Triangulate through SGD — the table is quoted against it, so a group
+    // defaulting to MYR can still price THB rather than falling back to 1:1.
+    const perSgdFrom = RATES.SGD?.[from as CurrencyCode]
+    const perSgdTo = RATES.SGD?.[to as CurrencyCode]
+    if (perSgdFrom && perSgdTo) return perSgdTo / perSgdFrom
     return 1
 }
 
@@ -74,6 +79,19 @@ export function toDefaultCurrency(
     const { rate } = resolveRate(defaultCurrency, code, saved)
     if (!rate) return amount
     return amount / rate
+}
+
+/** The other direction: what `amount` of the default currency buys in `code`. */
+export function fromDefaultCurrency(
+    amount: number,
+    code: string,
+    defaultCurrency: string,
+    saved: GroupRate[] | undefined
+): number {
+    if (code === defaultCurrency) return amount
+    const { rate } = resolveRate(defaultCurrency, code, saved)
+    if (!rate) return amount
+    return amount * rate
 }
 
 /**

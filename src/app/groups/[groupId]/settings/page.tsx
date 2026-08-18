@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Tabs from '~/app/_components/tabs'
+import HouseholdsCard from '~/app/_components/households-card'
 import { api } from '~/trpc/react'
 import { useGroupIdentity } from '~/app/_components/use-group-identity'
 import { SUPPORTED_CURRENCIES } from '~/lib/currencies'
@@ -178,8 +179,11 @@ const SettingsTab = () => {
                         </div>
                     </div>
 
+                    {/* Households — couples and families settle as one wallet */}
+                    {groupId && <HouseholdsCard groupId={groupId} members={users} />}
+
                     {/* You on this device */}
-                    <div className="card-dark anim-fade-up d-2" style={{ marginBottom: '1rem' }}>
+                    <div className="card-dark anim-fade-up d-3" style={{ marginBottom: '1rem' }}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 You on this device
@@ -225,7 +229,7 @@ const SettingsTab = () => {
                     </div>
 
                     {/* Default payee */}
-                    <div className="card-dark anim-fade-up d-3" style={{ marginBottom: '1rem' }}>
+                    <div className="card-dark anim-fade-up d-4" style={{ marginBottom: '1rem' }}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Default Payer
@@ -260,7 +264,7 @@ const SettingsTab = () => {
                     </div>
 
                     {/* Currencies */}
-                    <div className="card-dark anim-fade-up d-4" style={{ marginBottom: '1rem' }}>
+                    <div className="card-dark anim-fade-up d-5" style={{ marginBottom: '1rem' }}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Currencies
@@ -331,7 +335,7 @@ const SettingsTab = () => {
                     </div>
 
                     {/* Trip itinerary link */}
-                    <div className="card-dark anim-fade-up d-5" style={{ marginBottom: '1rem' }}>
+                    <div className="card-dark anim-fade-up d-6" style={{ marginBottom: '1rem' }}>
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Trip Itinerary
@@ -384,7 +388,7 @@ const SettingsTab = () => {
                     </div>
 
                     {/* Invite link */}
-                    <div className="card-dark anim-fade-up d-6">
+                    <div className="card-dark anim-fade-up d-7">
                         <div style={{ marginBottom: '1.25rem' }}>
                             <div style={{ fontWeight: 600, color: 'var(--heading)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
                                 Invite Link
