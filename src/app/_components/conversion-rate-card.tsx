@@ -94,20 +94,26 @@ export default function ConversionRateCard({ groupId, defaultCurrency, activeCod
                             }}
                         >
                             <div style={{ minWidth: 0 }}>
-                                {/* Hero quote */}
+                                {/* Hero quote. A rupiah rate is five digits before
+                                    the decimals, so the type scales with the screen
+                                    and folds after the "=" rather than running under
+                                    the Edit button. */}
                                 <div
                                     style={{
                                         fontFamily: 'var(--font-display), serif',
-                                        fontSize: '2rem',
+                                        fontSize: 'clamp(1.375rem, 6vw, 2rem)',
                                         fontWeight: 600,
                                         color: 'var(--heading)',
                                         letterSpacing: '-0.02em',
                                         lineHeight: 1.1,
-                                        whiteSpace: 'nowrap',
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        alignItems: 'baseline',
+                                        columnGap: '0.4375rem',
                                     }}
                                 >
-                                    {symbolFor(defaultCurrency)}1
-                                    <span style={{ color: 'var(--muted)', margin: '0 0.4375rem' }}>=</span>
+                                    <span>{symbolFor(defaultCurrency)}1</span>
+                                    <span style={{ color: 'var(--muted)' }}>=</span>
                                     <span style={{ color: 'var(--amber)' }}>
                                         {symbolFor(code)}
                                         {formatRate(rate)}
@@ -133,6 +139,7 @@ export default function ConversionRateCard({ groupId, defaultCurrency, activeCod
                                     background: 'var(--amber-dim)',
                                     color: 'var(--amber)',
                                     borderColor: 'var(--amber)',
+                                    flexShrink: 0,
                                 }}
                                 onClick={() => setEditing(code)}
                             >
