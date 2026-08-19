@@ -128,7 +128,13 @@ test.describe.serial('Settling by household', () => {
     await modal.locator('button', { hasText: 'Confirm' }).click()
 
     // Dan's S$250 clears the couples; Cara and Dan square up at home
-    await expect(page.locator('.stamp-seal')).toBeVisible()
+    await expect(page.locator('.stamp-seal').first()).toBeVisible()
     await expect(owedRows(page).filter({ hasText: 'Settle' })).toHaveCount(0)
+
+    // The payoff says what is actually true: the households are square, and
+    // the leftovers are between people sharing a wallet
+    const card = page.locator('.card-dark').filter({ hasText: 'Who owes whom' })
+    await expect(card).toContainText('All square')
+    await expect(card).toContainText('people who share a wallet')
   })
 })

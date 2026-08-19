@@ -84,6 +84,13 @@ Households are edited in group settings and applied on the balances page, where 
 
 A household row leads with the household names, keeps the real payer and receiver on the line beneath ("Dan pays Ana"), and settles as a normal `settleUp` between those two people — the server never sees a household.
 
+### The settled state (`src/app/_components/kamifubuki.tsx`)
+Clearing the board is the one moment the app celebrates. When a settlement leaves no transfers, the balances card swaps to a full-size 完済 hanko over "All square", and 紙吹雪 — paper-slip confetti in the group's own palette, a few slips landing face-up as 済 / 完 / 祝 — falls across the viewport for about three seconds and unmounts itself.
+
+It fires on the settlement that clears the board, never on merely opening a group that was already square: `settleUp.onSuccess` re-runs `transfersFor` against the refetched balances and celebrates only if nothing is left. The quiet 完済 state stays for every later visit. `prefers-reduced-motion: reduce` drops the storm and the stamp animation, keeping the seal.
+
+In household mode the copy stays honest — the households are square, and what remains is between people who share a wallet.
+
 ### Frontend (`src/app/`)
 - Pages are under `src/app/groups/[groupId]/` with tabs: summary, expenses, balances, history, settings
 - Shared UI components are in `src/app/_components/`

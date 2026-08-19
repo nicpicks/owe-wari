@@ -352,6 +352,44 @@ body::after {
   animation: stampIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* A full-size hanko for the payoff moment — 完済 ("paid in full")
+   reads down the seal the way a real one would. */
+.stamp-seal-lg {
+  width: 88px; height: 88px; border-radius: 14px;
+  border-width: 3px; font-size: 1.75rem; line-height: 1;
+  flex-direction: column; gap: 0.125rem;
+  animation-duration: 0.5s;
+}
+
+/* ─── 紙吹雪 Kamifubuki (paper-snowstorm confetti) ───────────────── */
+.kamifubuki {
+  position: fixed; inset: 0; z-index: 60;
+  pointer-events: none; overflow: hidden;
+}
+.kamifubuki-piece {
+  position: absolute; top: -10vh;
+  animation: kamifubukiFall var(--fall) cubic-bezier(0.32, 0.5, 0.55, 1) var(--delay) both;
+}
+/* The spin rides on an inner element so the fall keeps its own easing */
+.kamifubuki-piece > * {
+  display: block;
+  animation: kamifubukiSpin var(--spin) linear var(--delay) infinite;
+}
+@keyframes kamifubukiFall {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  6%   { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { transform: translate3d(var(--drift), 118vh, 0); opacity: 0; }
+}
+@keyframes kamifubukiSpin {
+  to { transform: rotate3d(var(--rx), var(--ry), 0.35, 360deg); }
+}
+/* Nobody needs a paper storm they did not ask for */
+@media (prefers-reduced-motion: reduce) {
+  .kamifubuki { display: none; }
+  .stamp-seal-lg { animation: none; }
+}
+
 /* ─── Kanji Glyph Tile ──────────────────────────────────────────── */
 .glyph-tile {
   border-radius: 8px;
