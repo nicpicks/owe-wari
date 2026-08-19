@@ -5,10 +5,17 @@ import { useEffect, useMemo, useState } from 'react'
 import Tabs from '~/app/_components/tabs'
 import SettleUpModal from '~/app/_components/settle-up-modal'
 import ConversionRateCard from '~/app/_components/conversion-rate-card'
+import Kamifubuki from '~/app/_components/kamifubuki'
 import { api } from '~/trpc/react'
-import { netBalances, simplifyDebts, simplifyHouseholdDebts } from '~/lib/simplify-debts'
+import {
+    netBalances,
+    simplifyDebts,
+    simplifyHouseholdDebts,
+    type Balance,
+    type Household,
+} from '~/lib/simplify-debts'
 import { formatAmount } from '~/lib/format-currency'
-import { fromDefaultCurrency } from '~/lib/fx-rates'
+import { fromDefaultCurrency, type GroupRate } from '~/lib/fx-rates'
 
 interface PendingSettle {
     fromUserId: string
@@ -20,6 +27,21 @@ interface PendingSettle {
 }
 
 const householdPrefKey = (groupId: string) => `owe-wari:settle-by-household:${groupId}`
+
+/**
+ * The whole pipeline in one place: fold every currency into the settle
+ * currency, then simplify — over households when they are in play, over
+ * people otherwise.
+ */
+function transfersFor(
+    balances: Balance[] | undefined,
+    settleCurrency: string,
+    rates: GroupRate[] | undefined,
+    households: Household[] | null
+) {
+    const netted = netBalances(balances ?? [], settleCurrency, rates)
+    return households ? simplifyHouseholdDebts(netted, households) : simplifyDebts(netted)
+}
 
 const BalancesTab = () => {
     const router = useRouter()
@@ -43,6 +65,12 @@ const BalancesTab = () => {
         { enabled: !!groupId }
     )
     const { data: households } = api.group.getHouseholds.useQuery(
+        { groupId },
+        { enabled: !!groupId }
+    )
+    // Only to tell "everything is paid off" apart from "nothing was ever
+    // spent" — a brand new group has no debts to celebrate clearing.
+    const { data: totals } = api.expense.getTotalExpenseCost.useQuery(
         { groupId },
         { enabled: !!groupId }
     )
@@ -91,6 +119,10 @@ const BalancesTab = () => {
         }
     }
 
+    // Fires only on the settlement that clears the board — never on merely
+    // opening a group that was already square.
+    const [celebrating, setCelebrating] = useState(false)
+
     const settleUp = api.expense.settleUp.useMutation({
         onSuccess: async (_data, vars) => {
             if (pending) {
@@ -107,6 +139,14 @@ const BalancesTab = () => {
                 ])
             }
             await utils.expense.getBalances.invalidate({ groupId })
+            const fresh = utils.expense.getBalances.getData({ groupId })
+            const left = transfersFor(
+                fresh,
+                defaultCurrency,
+                rates,
+                byHousehold ? households ?? [] : null
+            )
+            if (left.length === 0) setCelebrating(true)
             setPending(null)
         },
         onError: (error) => {
@@ -116,20 +156,24 @@ const BalancesTab = () => {
         },
     })
 
-    // Every currency folds into the group's settle currency first, so a pair
-    // never ends up owing each other in two directions at once.
-    const netted = useMemo(
-        () => netBalances(balances ?? [], defaultCurrency, rates),
+    const soloTransfers = useMemo(
+        () => transfersFor(balances, defaultCurrency, rates, null),
         [balances, defaultCurrency, rates]
     )
-
-    const soloTransfers = useMemo(() => simplifyDebts(netted), [netted])
     const householdTransfers = useMemo(
-        () => (hasHouseholds ? simplifyHouseholdDebts(netted, households ?? []) : []),
-        [netted, households, hasHouseholds]
+        () => (hasHouseholds ? transfersFor(balances, defaultCurrency, rates, households ?? []) : []),
+        [balances, defaultCurrency, rates, households, hasHouseholds]
     )
     const transfers = byHousehold ? householdTransfers : soloTransfers
     const saved = soloTransfers.length - householdTransfers.length
+
+    const hasSpending = !!totals && (totals.defaultTotal > 0 || totals.otherTotals.length > 0)
+    const nothingLeft = !isLoading && !isError && !!totals && transfers.length === 0
+    const isSettled = nothingLeft && hasSpending
+    const isFreshGroup = nothingLeft && !hasSpending
+    // Households square up between themselves at home; say so rather than
+    // claiming every individual book is at zero.
+    const restIsAtHome = isSettled && byHousehold && soloTransfers.length > 0
 
     const openTransfers = new Set(transfers.map((t) => `${t.from}|${t.to}`))
     const stampedRows = justSettled.filter((s) => !openTransfers.has(s.key))
@@ -155,15 +199,15 @@ const BalancesTab = () => {
                 <div className="card-dark anim-fade-up d-0">
                     <div style={{ marginBottom: '1.25rem' }}>
                         <div className="section-title">Who owes whom</div>
-                        <div className="section-sub">
-                            {isLoading
-                                ? 'Loading…'
-                                : isError
-                                    ? 'Could not load — try refreshing'
-                                    : transfers.length === 0
-                                        ? 'Everyone is all square'
+                        {(isLoading || isError || transfers.length > 0) && (
+                            <div className="section-sub">
+                                {isLoading
+                                    ? 'Loading…'
+                                    : isError
+                                        ? 'Could not load — try refreshing'
                                         : `${transfers.length} transfer${transfers.length !== 1 ? 's' : ''} to settle · tap to stamp it paid`}
-                        </div>
+                            </div>
+                        )}
 
                         {hasHouseholds && (
                             <div
@@ -305,6 +349,45 @@ const BalancesTab = () => {
                         </div>
                     ))}
 
+                    {isFreshGroup && (
+                        <div style={{ fontSize: '0.875rem', color: 'var(--muted)', padding: '0.5rem 0' }}>
+                            Nothing to settle yet — log an expense to get started.
+                        </div>
+                    )}
+
+                    {isSettled && (
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '0.875rem',
+                                padding: '1.25rem 0 0.75rem',
+                                textAlign: 'center',
+                            }}
+                        >
+                            <div className="stamp-seal stamp-seal-lg" aria-hidden>
+                                <span>完</span>
+                                <span>済</span>
+                            </div>
+                            <div
+                                style={{
+                                    fontFamily: 'var(--font-display), serif',
+                                    fontSize: '1.375rem',
+                                    fontWeight: 700,
+                                    color: 'var(--heading)',
+                                }}
+                            >
+                                All square
+                            </div>
+                            <div style={{ fontSize: '0.8125rem', color: 'var(--dim)', maxWidth: '20rem', lineHeight: 1.6 }}>
+                                {restIsAtHome
+                                    ? 'Every household is settled — what is left is between people who share a wallet.'
+                                    : 'Every debt in this group is cleared.'}
+                            </div>
+                        </div>
+                    )}
+
                     {!isLoading && !isError && !hasHouseholds && soloTransfers.length > 2 && (
                         <div style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: 'var(--muted)', lineHeight: 1.6 }}>
                             Travelling as couples or families?{' '}
@@ -328,6 +411,8 @@ const BalancesTab = () => {
                     )}
                 </div>
             </div>
+
+            <Kamifubuki active={celebrating} onDone={() => setCelebrating(false)} />
 
             <SettleUpModal
                 open={!!pending}
