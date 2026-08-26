@@ -63,6 +63,10 @@ The balances page runs three passes over the `Balance[]` from `getBalances`, all
 
 Rounding dust from FX conversion and split allocation is absorbed into the largest creditor, so every debtor pays exactly the figure shown against their name.
 
+**Cents are decided once, at the paying party.** `netBalances` keeps full precision and `settleParties` rounds — rounding each person first and summing households afterwards is what let a couple who were square to half a cent manufacture a S$0.01 debt and bill it to whoever else carried dust. For the same reason a party is tested against `DUST` (one cent) on its *precise* balance before it becomes a creditor or a debtor: converting at an agreed rate lands on fractions of a cent, and a settlement can only move whole ones.
+
+Amounts written to the database are whole cents everywhere — `expense.create` allocates an even split with `allocateByWeight` rather than storing `amount / n`, and `expense.update` rescales existing splits and payments through the same allocator. Sub-cent shares like `33.333333333333336` survive every settlement, so they have to never be written in the first place.
+
 ### Split modes (`src/app/_components/create-expense.tsx`)
 The expense form offers four ways to split: **Even**, **Portions** (relative shares — a bigger eater takes 2, someone who skipped takes 0), **%**, and **Manual**. They live in the `SPLIT_MODES` array; each entry supplies a `validate` (gates the submit button) and a `toPayload` (returns `splitUserIds` for the even split, or explicit `splitAmounts`). Adding a mode means adding an array entry plus its row UI — no API change.
 

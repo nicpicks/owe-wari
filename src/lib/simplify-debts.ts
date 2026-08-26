@@ -34,6 +34,16 @@ export interface Transfer {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+/** Kill float fuzz (0.30000000000000004) without rounding away real precision. */
+const tidy = (n: number) => Math.round(n * 1e6) / 1e6
+
+/**
+ * Under this, in the settle currency, is not a debt. Converting at an agreed
+ * rate lands on fractions of a cent while a settlement can only move whole
+ * ones, so a group that has just squared up sits a few thousandths off zero.
+ * Billing someone a cent for that is worse than forgetting it.
+ */
+const DUST = 0.01
 
 /**
  * Fold every currency into `settleCurrency` at the group's agreed rates and
@@ -42,6 +52,12 @@ const round2 = (n: number) => Math.round(n * 100) / 100
  * Simplifying currency by currency is what leaves a pair owing each other in
  * opposite directions — one Rp debt one way, an S$ debt the other. Once the
  * group has agreed a rate, those are the same money, so they subtract.
+ *
+ * The result keeps full precision on purpose. Rounding here and summing there
+ * is what let a household of two manufacture a cent out of nothing: two people
+ * genuinely at −134.825 and +134.815 round to −134.83 and +134.82, and their
+ * household — square to the tenth of a cent — shows a S$0.01 debt. Cents are
+ * settled on once, per paying party, in `settleParties`.
  */
 export function netBalances(
     balances: Balance[],
@@ -67,8 +83,8 @@ export function netBalances(
 
     const out: Balance[] = []
     for (const row of byUser.values()) {
-        const netBalance = round2(row.netBalance)
-        if (Math.abs(netBalance) < 0.005) continue
+        const netBalance = tidy(row.netBalance)
+        if (Math.abs(netBalance) < DUST) continue
         out.push({ ...row, netBalance })
     }
     return out
@@ -186,11 +202,12 @@ function settleParties(parties: Party[], currency: string): Transfer[] {
     const debtors: Array<Party & { amount: number }> = []
 
     for (const party of parties) {
-        const rounded = round2(party.netBalance)
-        if (rounded > 0) {
-            creditors.push({ ...party, amount: rounded })
-        } else if (rounded < 0) {
-            debtors.push({ ...party, amount: -rounded })
+        // Test the precise balance, hand over the rounded one: a party sitting
+        // half a cent from zero is square, not a one-cent debt.
+        if (party.netBalance >= DUST) {
+            creditors.push({ ...party, amount: round2(party.netBalance) })
+        } else if (party.netBalance <= -DUST) {
+            debtors.push({ ...party, amount: round2(-party.netBalance) })
         }
     }
 

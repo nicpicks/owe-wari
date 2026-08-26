@@ -3,6 +3,7 @@ import { eq, sql, and, isNull, isNotNull, desc } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
 import { createTRPCRouter, publicProcedure } from '~/server/api/trpc'
+import { allocateByWeight } from '~/lib/split-allocation'
 import {
     expenses,
     expenseAudits,
@@ -130,15 +131,21 @@ export const expenseRouter = createTRPCRouter({
                             )
                             .execute()
                     } else {
-                        // Even split
-                        const splitAmount = input.amount / splitUserIds.length
+                        // Even split, in whole cents. Storing amount/n raw wrote
+                        // shares like 33.333333333333336, and those thousandths
+                        // survive every settlement — a squared-up group would be
+                        // left owing itself a phantom cent.
+                        const shares = allocateByWeight(
+                            input.amount,
+                            splitUserIds.map(() => 1)
+                        )
                         await trx
                             .insert(expenseSplits)
                             .values(
-                                splitUserIds.map((userId) => ({
+                                splitUserIds.map((userId, i) => ({
                                     expenseId,
                                     userId,
-                                    amount: splitAmount.toString(),
+                                    amount: (shares[i] ?? 0).toString(),
                                 }))
                             )
                             .execute()
@@ -479,30 +486,40 @@ export const expenseRouter = createTRPCRouter({
                     if (changed.includes('amount') && amount !== undefined) {
                         const oldAmount = parseFloat(current.amount)
                         if (oldAmount > 0) {
-                            const ratio = amount / oldAmount
+                            // Rescale by the old amounts as weights rather than by a
+                            // raw ratio: whole cents that still add up to the new
+                            // total, instead of thousandths that never can.
                             const splits = await trx
                                 .select({ id: expenseSplits.id, amount: expenseSplits.amount })
                                 .from(expenseSplits)
                                 .where(eq(expenseSplits.expenseId, expenseId))
                                 .execute()
-                            for (const split of splits) {
+                            const splitShares = allocateByWeight(
+                                amount,
+                                splits.map((s) => parseFloat(s.amount))
+                            )
+                            for (const [i, split] of splits.entries()) {
                                 await trx
                                     .update(expenseSplits)
-                                    .set({ amount: (parseFloat(split.amount) * ratio).toString() })
+                                    .set({ amount: (splitShares[i] ?? 0).toString() })
                                     .where(eq(expenseSplits.id, split.id))
                                     .execute()
                             }
-                            // Scale payments by the same ratio so the paid side stays
-                            // consistent with the new total (handles single- and multi-payer).
+                            // The paid side moves the same way, so it stays consistent
+                            // with the new total (single- and multi-payer alike).
                             const payments = await trx
                                 .select({ id: expensePayments.id, amount: expensePayments.amount })
                                 .from(expensePayments)
                                 .where(eq(expensePayments.expenseId, expenseId))
                                 .execute()
-                            for (const payment of payments) {
+                            const paidShares = allocateByWeight(
+                                amount,
+                                payments.map((p) => parseFloat(p.amount))
+                            )
+                            for (const [i, payment] of payments.entries()) {
                                 await trx
                                     .update(expensePayments)
-                                    .set({ amount: (parseFloat(payment.amount) * ratio).toString() })
+                                    .set({ amount: (paidShares[i] ?? 0).toString() })
                                     .where(eq(expensePayments.id, payment.id))
                                     .execute()
                             }
